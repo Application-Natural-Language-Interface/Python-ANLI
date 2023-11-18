@@ -1,0 +1,2 @@
+pytest>=6.0
+# You can also include other development dependencies like pytest-cov, flake8, etc.
