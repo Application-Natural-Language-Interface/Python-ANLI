@@ -42,6 +42,10 @@ print(result)
 
 For more detailed documentation, please refer to the [official documentation](#).
 
+## Roadmap
+
+See the [Roadmap](ROADMAP.md) for a list of proposed features (and known issues).
+
 ## Contributing
 
 We welcome contributions! Please see our [Contribution Guide](CONTRIBUTING.md) for more information on how to get started.
