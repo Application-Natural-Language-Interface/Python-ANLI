@@ -1,16 +1,22 @@
 from setuptools import setup, find_packages
 
+# noted that some of the dependencies are not included in the setup.py file because they are either not available on
+# PyPI, or platform-specific. Please run the appropriate script in the install_scripts folder.
+
 setup(
-    name='anli',
+    name='Python-ANLI',
     version='0.0.1',
     author='Bo Wen',
     author_email='wenboown@gmail.com',
     description='A package to enable natural language interfacing for applications',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url='https://github.com/your_github/anli',
+    url='https://github.com/Application-Natural-Language-Interface/Python-ANLI',
     packages=find_packages(),
     install_requires=[
+        'guidance>=0.1',
+        'appdirs>=1.4.4',
+        'huggingface_hub[cli]',
         # Add here any dependencies your package needs, e.g.,
         # 'spacy>=3.0', 'transformers>=4.0'
     ],

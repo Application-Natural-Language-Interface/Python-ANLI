@@ -10,6 +10,23 @@ To install ANLI, simply use pip:
 pip install anli
 ```
 
+## Post-Installation Scripts
+Depending on your operating system and hardware, we provide different post-installation scripts to set up ANLI with the 
+default configuration (using llama.cpp model). After installing ANLI, please run the appropriate script from the `install_scripts` 
+folder inside your virtual environment:
+
+- For macOS (CPU): `install_scripts/install_macos_cpu.sh`
+- For macOS (GPU): `install_scripts/install_macos_gpu.sh`
+- For Linux or inside Docker (GPU): `install_scripts/install_linux_docker_gpu.sh`
+
+Make sure to give execute permissions to the scripts before running them:
+
+```bash
+chmod +x ./install_scripts/install_macos_cpu.sh
+```
+Replace `install_macos_cpu.sh` with the script that matches your environment.
+
+
 ## Quickstart
 Here's a quick example to get you started:
 
