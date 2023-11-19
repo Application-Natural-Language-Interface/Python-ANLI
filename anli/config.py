@@ -17,7 +17,7 @@ class Config:
             with open(config_path, 'r') as file:
                 self.data = yaml.load(file, Loader=yaml.FullLoader)
         else:
-            self.data = {}
+            self.data = {"llm_backend": {"type": "LlamaCpp"}}
 
     def get_model_path(self):
         # data_dir = appdirs.user_data_dir(Config.APP_NAME, Config.ORGANIZATION)
@@ -27,8 +27,8 @@ class Config:
             return model_path
 
         # Default to using identifier and filename if path is not provided
-        identifier = self.data.get('llm_backend', {}).get('identifier', Config.DEFAULT_MODEL_IDENTIFIER)
-        filename = self.data.get('llm_backend', {}).get('filename', Config.DEFAULT_MODEL_FILENAME)
+        identifier = self.data.get('llm_backend', {}).get('identifier', self.DEFAULT_MODEL_IDENTIFIER)
+        filename = self.data.get('llm_backend', {}).get('filename', self.DEFAULT_MODEL_FILENAME)
 
         # model_path = hf_hub_download(repo_id=identifier, filename=filename, cache_dir=data_dir)
         model_path = hf_hub_download(repo_id=identifier, filename=filename)

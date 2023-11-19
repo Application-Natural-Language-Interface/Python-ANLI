@@ -5,7 +5,10 @@ from anli.config import Config
 class NLUInterface:
     def __init__(self, config_path=None):
         # Load the configuration
-        self.config = Config(config_path)
+        if config_path is None:
+            self.config = Config()
+        else:
+            self.config = Config(config_path)
         self.mode = 'completion'
         # Load the model based on the configuration
         self.model = self.load_model()
@@ -78,12 +81,12 @@ class NLUInterface:
 
 
 # Example usage:
-import datetime
-a = datetime.datetime.now()
-nlu_interface = NLUInterface(config_path='config.yaml')
-prompt = "What's the weather like today?"
-nlu_results = nlu_interface.process_input(prompt)
-b = datetime.datetime.now()
-c = b - a
-print(nlu_results)
-print(c.total_seconds())
+# import datetime
+# a = datetime.datetime.now()
+# nlu_interface = NLUInterface(config_path='config.yaml')
+# prompt = "What's the weather like today?"
+# nlu_results = nlu_interface.process_input(prompt)
+# b = datetime.datetime.now()
+# c = b - a
+# print(nlu_results)
+# print(c.total_seconds())
