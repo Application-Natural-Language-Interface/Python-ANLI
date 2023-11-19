@@ -9,28 +9,48 @@ from anli.config import APP_NAME, ORGANIZATION
 
 
 class CombinedCache:
-    def __init__(self):
+    def __init__(self, lru_limit=3, lfu_limit=5, cache_file=None):
         """
-        Initializes the Combined Cache System.
+        Initializes the Combined Cache System with configurable LRU and LFU limits.
+
+        Parameters:
+        lru_limit (int): Number of top items to keep in the LRU cache.
+        lfu_limit (int): Number of top items to keep in the LFU cache.
+        cache_file (str, optional): File path to load/save the cache state.
 
         This constructor initializes the cache with both LRU and LFU components and
         starts a background thread for processing queued updates. It also loads the
         cache state from a file if it exists.
         """
+        self.lru_limit = lru_limit
+        self.lfu_limit = lfu_limit
         self.cache_data = {
             "lru_cache": OrderedDict(),
             "lfu_count": Counter(),
             "lfu_cache": set()
         }
-        self.app_dir = appdirs.user_data_dir(APP_NAME, ORGANIZATION)
-        self.cache_file = os.path.join(self.app_dir, "cache_data.json")
+        if cache_file is None:
+            app_dir = appdirs.user_data_dir(APP_NAME, ORGANIZATION)
+            self.cache_file = os.path.join(app_dir, "cache_data.json")
+        else:
+            self.cache_file = cache_file
         self.update_queue = queue.Queue()
         self.lock = threading.Lock()
         self.worker_thread = threading.Thread(target=self.process_updates)
         self.worker_thread.start()
-        self.load_cache()
+        self.update_processed = threading.Event()
+        self.pending_updates = 0
+        self.pending_updates_lock = threading.Lock()
+        self.load_cache(self.cache_file)
 
-    def load_cache(self):
+    def reset_cache(self):
+        self.cache_data = {
+            "lru_cache": OrderedDict(),
+            "lfu_count": Counter(),
+            "lfu_cache": set()
+        }
+
+    def load_cache(self, cache_file=None):
         """
         Loads the cache state from a JSON file.
 
@@ -38,8 +58,8 @@ class CombinedCache:
         platform-specific application data directory. If the file does not
         exist, it initializes an empty cache.
         """
-        if os.path.exists(self.cache_file):
-            with open(self.cache_file, 'r') as file:
+        if os.path.exists(cache_file):
+            with open(cache_file, 'r') as file:
                 data = json.load(file)
                 self.cache_data["lru_cache"] = OrderedDict(data.get("lru_cache", {}))
                 self.cache_data["lfu_count"] = Counter(data.get("lfu_count", {}))
@@ -53,7 +73,8 @@ class CombinedCache:
         platform-specific application data directory. It is typically called
         during application shutdown.
         """
-        os.makedirs(self.app_dir, exist_ok=True)
+        app_dir = os.path.dirname(os.path.abspath(self.cache_file))
+        os.makedirs(app_dir, exist_ok=True)
         with open(self.cache_file, 'w') as file:
             data = {
                 "lru_cache": list(self.cache_data["lru_cache"].items()),
@@ -108,6 +129,19 @@ class CombinedCache:
                 new_cache_data = copy.deepcopy(self.cache_data)
                 update_action(new_cache_data)
                 self.cache_data = new_cache_data
+
+            with self.pending_updates_lock:
+                self.pending_updates -= 1
+                if self.pending_updates == 0:
+                    self.update_processed.set()  # Signal that all updates are processed
+
+    def wait_for_update_processing(self):
+        """
+        Waits for the completion of the current update processing.
+        This method blocks until the background thread signals that the current update is processed.
+        """
+        self.update_processed.wait()
+        self.update_processed.clear()
 
     def access_item(self, item):
         """
@@ -167,17 +201,23 @@ class CombinedCache:
             if len(lfu_cache) > 8:
                 least_common = lfu_count.most_common()[:-9:-1]
                 for k, _ in least_common:
-                    lfu_cache.remove(k)
+                    if k in lfu_cache:
+                        lfu_cache.remove(k)
 
+        with self.pending_updates_lock:
+            self.pending_updates += 1
         self.update_queue.put(update_action)
 
     def get_combined_cache(self):
         """
-        Retrieves the combined state of the cache.
+        Retrieves a combined list of top items from LRU and LFU caches.
+
+        Important Note: consider to call `wait_for_update_processing` before calling this method, if you want to
+        ensure getting the latest cache state.
 
         Returns:
-        list: A list containing the top items from both the LRU and LFU caches,
-        with a preference for LRU items in case of overlap.
+        list: A list containing the top items from LRU and LFU caches,
+              based on the configured limits, ensuring no overlap, with a preference for LRU items.
 
         This method combines the top items from the LRU and LFU caches into a
         single list, ensuring there's no overlap between them.
@@ -186,11 +226,12 @@ class CombinedCache:
             lru_cache = self.cache_data["lru_cache"]
             lfu_count = self.cache_data["lfu_count"]
 
-            # Get top 3 LRU items
-            lru_top = list(lru_cache.keys())[-3:]
+            # Get top LRU items based on the configured limits
+            lru_top = list(lru_cache.keys())[-self.lru_limit:]
 
-            # Get top 5 LFU items, excluding those already in LRU top
-            lfu_top = [item for item, _ in lfu_count.most_common(8) if item not in lru_top][:5]
+            # Get top LFU items, excluding those already in LRU top
+            lfu_top = [item for item, _ in lfu_count.most_common(self.lfu_limit + self.lru_limit)
+                       if item not in lru_top][:self.lfu_limit]
 
             return lru_top + lfu_top
 
