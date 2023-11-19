@@ -1,0 +1,5 @@
+llm_backend:
+  type: LlamaCpp
+  model_path: /path/to/your/llama/cpp/model
+  identifier: TheBloke/Llama-2-7b-Chat-GGUF  # Update with actual model identifier
+  filename: llama-2-7b-chat.Q4_K_M.gguf      # Update with actual model filename

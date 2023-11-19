@@ -1,5 +1,6 @@
 import yaml
 import os
+from huggingface_hub import hf_hub_download
 
 
 class Config:
@@ -8,26 +9,37 @@ class Config:
     ORGANIZATION = 'ANLI'  # this will be used as appauthor in appdirs
 
     # Define the default models, can be overridden by config.yaml
-    MODEL_IDENTIFIER = "TheBloke/Mistral-7B-Instruct-v0.1-GGUF"
-    MODEL_FILENAME = "mistral-7b-instruct-v0.1.Q4_K_M.gguf"
-
-    # MODEL_IDENTIFIER = "TheBloke/Llama-2-7b-Chat-GGUF"
-    # MODEL_FILENAME = "llama-2-7b-chat.Q6_K.gguf"
+    DEFAULT_MODEL_IDENTIFIER = "TheBloke/Mistral-7B-Instruct-v0.1-GGUF"
+    DEFAULT_MODEL_FILENAME = "mistral-7b-instruct-v0.1.Q4_K_M.gguf"
 
     def __init__(self, config_path='config.yaml'):
         if os.path.exists(config_path):
             with open(config_path, 'r') as file:
-                # If a config.yaml is provided, override the model defaults
-                yaml_config = yaml.load(file, Loader=yaml.FullLoader)
-                self.MODEL_IDENTIFIER = yaml_config.get('model', {}).get('identifier', Config.MODEL_IDENTIFIER)
-                self.MODEL_FILENAME = yaml_config.get('model', {}).get('filename', Config.MODEL_FILENAME)
+                self.data = yaml.load(file, Loader=yaml.FullLoader)
         else:
-            # No config.yaml provided; use the default values
-            self.MODEL_IDENTIFIER = Config.MODEL_IDENTIFIER
-            self.MODEL_FILENAME = Config.MODEL_FILENAME
+            self.data = {}
+
+    def get_model_path(self):
+        # data_dir = appdirs.user_data_dir(Config.APP_NAME, Config.ORGANIZATION)
+        model_path = self.data.get('llm_backend', {}).get('model_path', '')
+
+        if model_path and os.path.exists(model_path):
+            return model_path
+
+        # Default to using identifier and filename if path is not provided
+        identifier = self.data.get('llm_backend', {}).get('identifier', Config.DEFAULT_MODEL_IDENTIFIER)
+        filename = self.data.get('llm_backend', {}).get('filename', Config.DEFAULT_MODEL_FILENAME)
+
+        # model_path = hf_hub_download(repo_id=identifier, filename=filename, cache_dir=data_dir)
+        model_path = hf_hub_download(repo_id=identifier, filename=filename)
+
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model not found: {model_path}")
+
+        return model_path
 
 
-# Usage example:
-# Instantiate the Config class and use properties as needed
+# Example usage:
 # config = Config('config.yaml')
-# print(config.MODEL_IDENTIFIER)
+# model_path = config.get_model_path()
+# print(model_path)

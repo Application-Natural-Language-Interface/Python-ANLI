@@ -20,6 +20,12 @@ setup(
         # Add here any dependencies your package needs, e.g.,
         # 'spacy>=3.0', 'transformers>=4.0'
     ],
+    extras_require={
+        'transformer': [
+            'transformers',  # Hugging Face Transformers library
+            'sentencepiece',  # SentencePiece, used by some Transformer models
+        ],
+    },
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',

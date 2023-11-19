@@ -10,6 +10,13 @@ To install ANLI, simply use pip:
 pip install anli
 ```
 
+or install from source:
+```bash
+git clone https://github.com/Application-Natural-Language-Interface/Python-ANLI.git
+cd anli
+pip install -e .
+```
+
 ## Post-Installation Scripts
 Depending on your operating system and hardware, we provide different post-installation scripts to set up ANLI with the 
 default configuration (using llama.cpp model). After installing ANLI, please run the appropriate script from the `install_scripts` 
@@ -26,6 +33,18 @@ chmod +x ./install_scripts/install_macos_cpu.sh
 ```
 Replace `install_macos_cpu.sh` with the script that matches your environment.
 
+
+## Models
+ANLI uses Large Language Models (LLMs) to process natural language input. 
+We provide a default model based on 
+[Mistral 7B Instruct v0.1](https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF), 
+and use llama.cpp to run inference on the model.
+
+You can load other models by providing a config.yaml file, and load it with `NLUInterface(config_path='config.yaml')`
+
+You can use HF Transformer instead of llama.cpp. But you need to do `pip install anli[transformer]` 
+(or `pip install -e .[transformer]`) to install the dependencies.
+Note that it can be much slower than llama.cpp.
 
 ## Quickstart
 Here's a quick example to get you started:
