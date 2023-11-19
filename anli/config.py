@@ -1,12 +1,14 @@
+import warnings
 import yaml
 import os
 from huggingface_hub import hf_hub_download
 
+# Define package metadata, Constants
+APP_NAME = 'Python-ANLI'  # this will be used as the AppName of the package
+ORGANIZATION = 'ANLI'  # this will be used as appauthor in appdirs
+
 
 class Config:
-    # Define package metadata, Constants
-    APP_NAME = 'Python-ANLI'  # this will be used as the AppName of the package
-    ORGANIZATION = 'ANLI'  # this will be used as appauthor in appdirs
 
     # Define the default models, can be overridden by config.yaml
     DEFAULT_MODEL_IDENTIFIER = "TheBloke/Mistral-7B-Instruct-v0.1-GGUF"
@@ -17,6 +19,7 @@ class Config:
             with open(config_path, 'r') as file:
                 self.data = yaml.load(file, Loader=yaml.FullLoader)
         else:
+            warnings.warn(f"Config file not found: {config_path}. Using default config.")
             self.data = {"llm_backend": {"type": "LlamaCpp"}}
 
     def get_model_path(self):
