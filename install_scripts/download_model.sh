@@ -10,11 +10,12 @@ if ! command -v huggingface-cli &> /dev/null; then
 fi
 
 # Define model details
-MODEL_IDENTIFIER=$(python -c "from anli.config import MODEL_IDENTIFIER; print(MODEL_IDENTIFIER)")
-MODEL_FILENAME=$(python -c "from anli.config import MODEL_FILENAME; print(MODEL_FILENAME)")
+MODEL_IDENTIFIER=$(python -c "from anli.config import Config; config = Config(); print(config.MODEL_IDENTIFIER)")
+MODEL_FILENAME=$(python -c "from anli.config import Config; config = Config(); print(config.MODEL_FILENAME)")
 
 # Use Python and appdirs to get the data directory path
-DATA_DIR=$(python -c "from anli.config import APP_NAME, ORGANIZATION; import appdirs; print(appdirs.user_data_dir(APP_NAME, ORGANIZATION))")
+DATA_DIR=$(python -c "from anli.config import Config; import appdirs; config = Config(); print(appdirs.user_data_dir
+(config.APP_NAME, config.ORGANIZATION))")
 
 # Create the data directory if it does not exist
 mkdir -p "${DATA_DIR}"
