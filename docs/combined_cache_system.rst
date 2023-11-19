@@ -7,67 +7,48 @@ Combined Cache System
 
 Introduction
 ------------
-The Combined Cache System is a sophisticated caching solution designed to optimize data retrieval by leveraging a blend of Least Recently Used (LRU) and Least Frequently Used (LFU) caching strategies. This system is tailored for environments where fast read access is crucial, and consistency in multi-threaded operations is paramount.
+The Combined Cache System is an advanced caching solution designed to optimize data retrieval by leveraging both Least Recently Used (LRU) and Least Frequently Used (LFU) caching strategies. It is tailored for environments where fast read access and consistent performance in multi-threaded operations are crucial.
 
 Features
 --------
-- **LRU and LFU Combination:** Utilizes a mix of LRU and LFU caching strategies to store and access data efficiently.
-- **Immutable Data Structures:** Employs immutable data structures to ensure thread-safe read operations.
-- **Asynchronous Write Operations:** Queues write/update actions for processing in a background thread.
-- **Cross-Platform File Storage:** Leverages the `appdirs` package to determine storage locations, ensuring cross-platform compatibility.
-- **Graceful Shutdown:** Includes mechanisms to save the cache state to a file during application shutdown.
+- **Configurable LRU and LFU Limits:** Users can specify the number of top items to retain in both LRU and LFU caches.
+- **Immutable Data Structures:** Ensures thread-safe read operations using immutable data structures.
+- **Asynchronous Write Operations:** Write/update actions are queued and processed in a background thread for non-blocking operations.
+- **Thread Synchronization:** Incorporates synchronization mechanisms to ensure that the cache state is consistent before read operations.
+- **Graceful Shutdown:** Implements a robust shutdown mechanism to correctly stop the background thread and release resources.
+- **Cross-Platform File Storage:** Utilizes the `appdirs` package to determine storage locations, ensuring compatibility across different platforms.
 
-Design Considerations
----------------------
-The design of the Combined Cache System focuses on several key aspects:
-
-- **Read and Write Efficiency:** Balances fast read access with consistent and orderly write operations.
-- **Thread Safety:** Ensures safe access in a multi-threaded environment using locks and immutable data structures.
-- **Data Consistency:** Maintains cache consistency, especially when handling multiple concurrent write operations.
-- **Scalability:** Designed to be effective for a wide range of workloads and adaptable to different usage patterns.
-
-Implementation Details
-----------------------
-The cache system is implemented in Python, with the following components:
-
-- **LRU Cache:** A sub-component that tracks the most recently accessed items.
-- **LFU Cache:** A sub-component that keeps count of item access frequencies.
-- **Update Queue:** A thread-safe queue that manages write operations.
-- **Background Processing:** A dedicated thread for processing queued updates.
-
-Usage
------
-To use the Combined Cache System:
-
-1. Initialize the cache.
-2. Access or update items using the `access_item` method.
-3. Retrieve the combined cache state using `get_combined_cache`.
-4. On application shutdown, call `shutdown` to save the cache state.
+Configuration
+-------------
+The cache can be configured with custom limits for both the LRU and LFU caches upon initialization. This allows for flexible adaptation to different access patterns and requirements.
 
 .. code-block:: python
 
-   cache = CombinedCache()
-   cache.access_item("item1")
-   combined_cache = cache.get_combined_cache()
+   cache = CombinedCache(lru_limit=4, lfu_limit=6)
+
+Background Processing and Synchronization
+-----------------------------------------
+The cache system processes write operations asynchronously in a background thread. Synchronization mechanisms are in place to ensure consistency between read and write operations.
+
+.. code-block:: python
+
+   cache.access_item("some_item")
+   cache.wait_for_update_processing()  # Ensures that updates are processed
+
+Graceful Shutdown
+-----------------
+The cache system includes a `shutdown` method that should be called to properly terminate the background thread and save the cache state. This is crucial for preventing resource leaks and ensuring data integrity.
+
+.. code-block:: python
+
    cache.shutdown()
 
-Thread Safety Considerations
-----------------------------
-The cache system ensures thread safety through:
-
-- **Locking Mechanisms:** Utilizes locks to manage concurrent read and write access.
-- **Immutable Snapshots:** Uses immutable data structures to allow uninterrupted read access during write operations.
-
-Performance Implications
-------------------------
-The design choices made in the Combined Cache System aim to balance performance with consistency:
-
-- **Lock Duration:** The lock covers the entire update process, prioritizing consistency over potential performance gains from a more relaxed locking strategy.
-- **Read Optimization:** Read operations are designed to be fast and non-blocking.
-- **Update Queuing:** Write operations are queued and processed asynchronously to prevent blocking reads.
+Thread Safety
+-------------
+The system is designed to be thread-safe, allowing multiple threads to interact with the cache without compromising data integrity.
 
 Conclusion
 ----------
-The Combined Cache System offers a robust and efficient caching solution, suitable for applications where fast read access and data consistency in a multi-threaded environment are crucial. Its design is a thoughtful balance of different caching strategies and concurrency control mechanisms.
+The Combined Cache System offers a robust and efficient solution for caching, suitable for applications requiring fast access and consistent performance in multi-threaded environments. Its design reflects a balance between different caching strategies and concurrency control mechanisms.
 
-.. note:: For a detailed explanation of the locking strategy and other design decisions, refer to the "Design Decisions" section in the extended documentation.
+.. note:: For detailed information on the implementation and usage of the cache system, refer to the extended documentation.
