@@ -34,9 +34,10 @@ class CombinedCache:
             self.cache_file = os.path.join(app_dir, "cache_data.json")
         else:
             self.cache_file = cache_file
+        self.shutdown_flag = False
         self.update_queue = queue.Queue()
         self.lock = threading.Lock()
-        self.worker_thread = threading.Thread(target=self.process_updates)
+        self.worker_thread = threading.Thread(target=self.process_updates, daemon=True)
         self.worker_thread.start()
         self.update_processed = threading.Event()
         self.pending_updates = 0
@@ -75,6 +76,7 @@ class CombinedCache:
         """
         app_dir = os.path.dirname(os.path.abspath(self.cache_file))
         os.makedirs(app_dir, exist_ok=True)
+        print(f"Saving cache to {self.cache_file}")
         with open(self.cache_file, 'w') as file:
             data = {
                 "lru_cache": list(self.cache_data["lru_cache"].items()),
@@ -99,7 +101,7 @@ class CombinedCache:
         """
         while True:
             update_action = self.update_queue.get()
-            if update_action is None:
+            if update_action is None or self.shutdown_flag:
                 break  # Termination signal
 
             with self.lock:
@@ -243,14 +245,26 @@ class CombinedCache:
         for it to finish processing. It then calls `save_cache` to persist the
         current state of the cache.
         """
-        self.update_queue.put(None)  # Send termination signal
-        self.worker_thread.join()
-        self.save_cache()
 
+        def shutdown(self):
+            # Signal the background thread to terminate
+            self.shutdown_flag = True
+            self.update_queue.put(None)  # Wake up the thread if it's waiting on the queue
 
-# Example usage
-cache = CombinedCache()
-cache.access_item("item1")
-# ... more operations ...
-combined_cache = cache.get_combined_cache()
-cache.shutdown()
+            # Release any locks or signal any events that might be blocking the thread
+            self.lock.release()
+            self.pending_updates_lock.release()
+            self.update_processed.set()
+
+            # Wait for the thread to finish
+            self.worker_thread.join()
+
+            # Save the cache state
+            self.save_cache()
+
+            # Clear the queue
+            while not self.update_queue.empty():
+                self.update_queue.get()
+
+            # Reset event
+            self.update_processed.clear()
