@@ -1,0 +1,23 @@
+llm_chat:
+  type: LlamaCpp
+  identifier: TheBloke/Llama-2-7b-Chat-GGUF  # Update with actual model identifier
+  filename: llama-2-7b-chat.Q4_K_M.gguf      # Update with actual model filename
+
+#  type: Transformers
+#  model: mistralai/Mistral-7B-Instruct-v0.1
+
+#  type: OpenAI
+#  model: gpt-3.5-turbo-1106 # Replace with the model you want to use
+#  api_key: YOUR_OPENAI_API_KEY  # Replace with your actual API key
+
+llm_completion:
+  type: LlamaCpp
+  identifier: TheBloke/Llama-2-7b-GGUF  # Update with actual model identifier
+  filename: llama-2-7b.Q4_K_M.gguf      # Update with actual model filename
+
+#  type: Transformers
+#  model: mistralai/Mistral-7B-Instruct-v0.1
+
+#  type: OpenAI
+#  model: gpt-3.5-turbo-instruct # Replace with the model you want to use
+#  api_key: YOUR_OPENAI_API_KEY  # Replace with your actual API key
