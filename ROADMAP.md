@@ -2,6 +2,22 @@
 
 This document outlines the planned features and milestones for the ANLI project.
 
+### tech stack selection
+At first stage, we are aiming for edge and single user, single ANLI instance use cases, so we want to select 
+lightweight tech stack.
+
+vectordb : chromadb + local persisted storage
+sqldb: sqlite3
+llm: llama.cpp
+kv store: redis?
+cache: in memory
+
+Second stage, still aiming for edge and single user, but multiple ANLI instances. So we should consider how to 
+coordinate different instances running in the same environment to share same engine.
+
+Third stage, for multi user use case, we probably won't see it in edge, so we can expand to use more heavy tech stack 
+and need to consider multi-tenancy.
+
 ## Version 0.1.0 - Proof of Concept
 - [ ] **Integration Layer for Python Functions**:
   - Implement and test decorators for function registration.

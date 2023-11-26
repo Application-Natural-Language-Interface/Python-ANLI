@@ -4,18 +4,22 @@ ANLI is a Python package designed to enable developers to wrap their application
 
 ## Installation
 
-To install ANLI, simply use pip:
-
-```bash
-pip install anli
-```
-
-or install from source:
+Install from source:
 ```bash
 git clone https://github.com/Application-Natural-Language-Interface/Python-ANLI.git
-cd anli
+cd Python-ANLI
 pip install -e .
 ```
+
+
+[//]: # (To install ANLI, simply use pip &#40;coming soon&#41;:)
+
+[//]: # ()
+[//]: # (```bash)
+
+[//]: # (pip install anli)
+
+[//]: # (```)
 
 ## Post-Installation Scripts
 Depending on your operating system and hardware, we provide different post-installation scripts to set up ANLI with the 
@@ -56,25 +60,39 @@ You can use HF Transformer instead of llama.cpp. But you need to do `pip install
 (or `pip install -e .[transformer]`) to install the dependencies.
 Note that it can be much slower than llama.cpp.
 
-## Quickstart
-Here's a quick example to get you started:
+[//]: # (## Quickstart)
 
-```python
-from anli import ANLI
+[//]: # (Here's a quick example to get you started:)
 
-# Define your function and wrap it with ANLI decorator
-@ANLI.register
-def greet(name: str):
-    """A simple function to greet the user."""
-    return f"Hello, {name}!"
+[//]: # ()
+[//]: # (```python)
 
-# Start the ANLI interface
-anli_interface = ANLI()
+[//]: # (from anli import ANLI)
 
-# Example of using natural language to call the function
-result = anli_interface.process("I'd like to be greeted!")
-print(result)
-```
+[//]: # ()
+[//]: # (# Define your function and wrap it with ANLI decorator)
+
+[//]: # (@ANLI.register)
+
+[//]: # (def greet&#40;name: str&#41;:)
+
+[//]: # (    """A simple function to greet the user.""")
+
+[//]: # (    return f"Hello, {name}!")
+
+[//]: # ()
+[//]: # (# Start the ANLI interface)
+
+[//]: # (anli_interface = ANLI&#40;&#41;)
+
+[//]: # ()
+[//]: # (# Example of using natural language to call the function)
+
+[//]: # (result = anli_interface.process&#40;"I'd like to be greeted!"&#41;)
+
+[//]: # (print&#40;result&#41;)
+
+[//]: # (```)
 
 ## Features
 
