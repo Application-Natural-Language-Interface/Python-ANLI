@@ -1,3 +1,0 @@
-llm_backend:
-  type: Transformers
-  model_name: mistralai/Mistral-7B-Instruct-v0.1

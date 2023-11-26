@@ -3,7 +3,8 @@ import warnings
 import yaml
 import os
 from huggingface_hub import hf_hub_download
-from guidance import models, gen
+from guidance import models, instruction
+from contextlib import contextmanager
 
 # Define package metadata, Constants
 APP_NAME = 'Python-ANLI'  # this will be used as the AppName of the package
@@ -18,6 +19,7 @@ class Config:
     # Define the default models, can be overridden by config.yaml
     DEFAULT_MODEL_IDENTIFIER = "TheBloke/Mistral-7B-Instruct-v0.1-GGUF"
     DEFAULT_MODEL_FILENAME = "mistral-7b-instruct-v0.1.Q4_K_M.gguf"
+    DEFAULT_MODEL_CTX = 4096
 
     def __init__(self, config_path='config.yaml'):
         if os.path.exists(config_path):
@@ -26,9 +28,15 @@ class Config:
         else:
             warnings.warn(f"Config file not found: {config_path}. Using default config.")
             self.config = {"llm_chat": {"type": "LlamaCpp"}, "llm_completion": {"type": "LlamaCpp"}}
+        # use dummy context by default except for OpenAI:
+        self.unified_instruction = self.dummy_context
         # Load the model based on the configuration
         self.model_chat = self.load_model("llm_chat")
         self.model_completion = self.load_model("llm_completion")
+
+    @contextmanager
+    def dummy_context(self):
+        yield
 
     def load_model(self, mode):
         # Determine which model class to use based on config
@@ -47,6 +55,8 @@ class Config:
                 logging.debug(f"loading chat model: {backend_config['model']}")
                 return models.OpenAI(backend_config['model'], api_key=backend_config['api_key'])
             else:
+                # if we use OpenAI for completion, we need to use the instruction context:
+                self.unified_instruction = instruction
                 logging.debug(f"loading completion model: {backend_config['model']}")
                 return models.OpenAI(backend_config['model'], api_key=backend_config['api_key'])
         else:
@@ -57,10 +67,12 @@ class Config:
             model_path = hf_hub_download(repo_id=identifier, filename=filename)
             if mode == "llm_chat":
                 logging.debug(f"loading chat model: {identifier}-{filename}")
-                return models.LlamaCppChat(model_path)
+                # return models.LlamaCppChat(model_path, n_gpu_layers=-1, main_gpu=1, n_ctx=self.DEFAULT_MODEL_CTX)
+                return models.LlamaCppChat(model_path, n_ctx=self.DEFAULT_MODEL_CTX)
             else:
                 logging.debug(f"loading completion model: {identifier}-{filename}")
-                return models.LlamaCpp(model_path)
+                # return models.LlamaCpp(model_path, n_gpu_layers=-1, main_gpu=1, n_ctx=self.DEFAULT_MODEL_CTX)
+                return models.LlamaCpp(model_path, n_ctx=self.DEFAULT_MODEL_CTX)
 
     # def process_input(self, input_text):
     #     # Ensures the model is loaded
