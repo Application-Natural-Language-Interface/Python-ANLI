@@ -17,6 +17,8 @@ setup(
         'guidance>=0.1',
         'appdirs>=1.4.4',
         'huggingface_hub[cli]',
+        'langchain',
+        'duckduckgo-search'
         # Add here any dependencies your package needs, e.g.,
         # 'spacy>=3.0', 'transformers>=4.0'
     ],
