@@ -67,12 +67,12 @@ class Config:
             model_path = hf_hub_download(repo_id=identifier, filename=filename)
             if mode == "llm_chat":
                 logging.debug(f"loading chat model: {identifier}-{filename}")
-                # return models.LlamaCppChat(model_path, n_gpu_layers=-1, main_gpu=1, n_ctx=self.DEFAULT_MODEL_CTX)
-                return models.LlamaCppChat(model_path, n_ctx=self.DEFAULT_MODEL_CTX)
+                return models.LlamaCppChat(model_path, n_gpu_layers=int(backend_config.get('n_gpu_layers', 0)),
+                                           n_ctx=self.DEFAULT_MODEL_CTX)
             else:
                 logging.debug(f"loading completion model: {identifier}-{filename}")
-                # return models.LlamaCpp(model_path, n_gpu_layers=-1, main_gpu=1, n_ctx=self.DEFAULT_MODEL_CTX)
-                return models.LlamaCpp(model_path, n_ctx=self.DEFAULT_MODEL_CTX)
+                return models.LlamaCpp(model_path, n_gpu_layers=int(backend_config.get('n_gpu_layers', 0)),
+                                       n_ctx=self.DEFAULT_MODEL_CTX)
 
     # def process_input(self, input_text):
     #     # Ensures the model is loaded

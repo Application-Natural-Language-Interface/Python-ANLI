@@ -1,7 +1,8 @@
 llm_chat:
   type: LlamaCpp
-  identifier: TheBloke/Llama-2-7b-Chat-GGUF  # Update with actual model identifier
-  filename: llama-2-7b-chat.Q4_K_M.gguf      # Update with actual model filename
+  identifier: TheBloke/Mistral-7B-Instruct-v0.1-GGUF  # Update with actual model identifier
+  filename: mistral-7b-instruct-v0.1.Q4_K_M.gguf      # Update with actual model filename
+  n_gpu_layers: -1 # -1 means all layers
 
 #  type: Transformers
 #  model: mistralai/Mistral-7B-Instruct-v0.1
@@ -12,8 +13,9 @@ llm_chat:
 
 llm_completion:
   type: LlamaCpp
-  identifier: TheBloke/Llama-2-7b-GGUF  # Update with actual model identifier
-  filename: llama-2-7b.Q4_K_M.gguf      # Update with actual model filename
+  identifier: TheBloke/Mistral-7B-Instruct-v0.1-GGUF  # Update with actual model identifier
+  filename: mistral-7b-instruct-v0.1.Q4_K_M.gguf      # Update with actual model filename
+  n_gpu_layers: -1 # -1 means all layers
 
 #  type: Transformers
 #  model: mistralai/Mistral-7B-Instruct-v0.1
