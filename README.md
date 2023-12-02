@@ -47,6 +47,12 @@ folder inside your virtual environment:
 3. **Run the Script**: Navigate to the folder containing the script `install_windows.ps1`. 
 Execute the script by typing `.\install_windows.ps1` and pressing Enter.
 
+## Dependencies
+
+- redis
+    ```bash
+    docker run -d -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
+    ```
 
 ## Models
 ANLI uses Large Language Models (LLMs) to process natural language input. 

@@ -18,7 +18,11 @@ setup(
         'appdirs>=1.4.4',
         'huggingface_hub[cli]',
         'langchain',
-        'duckduckgo-search'
+        'duckduckgo-search',
+        'redis',
+        'redisvl',
+        'jsonpath-ng',
+        'sentence-transformers'
         # Add here any dependencies your package needs, e.g.,
         # 'spacy>=3.0', 'transformers>=4.0'
     ],
