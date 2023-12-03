@@ -5,15 +5,30 @@ import os
 from huggingface_hub import hf_hub_download
 from guidance import models, instruction
 from contextlib import contextmanager
+from .utils import RedisVectorStoreForJSON
 
 # Define package metadata, Constants
 APP_NAME = 'Python-ANLI'  # this will be used as the AppName of the package
 ORGANIZATION = 'ANLI'  # this will be used as appauthor in appdirs
 
 
-class Config:
+class BaseConfig:
+    """Base configuration class for the package"""
+
+    def __init__(self, config_file='config.yaml'):
+        if os.path.exists(config_file):
+            with open(config_file, 'r') as file:
+                self.config = yaml.load(file, Loader=yaml.FullLoader)
+        else:
+            warnings.warn(f"Config file not found: {config_file}. Using default config.")
+            self.config = {"llm_chat": {"type": "LlamaCpp"},
+                           "llm_completion": {"type": "LlamaCpp"},
+                           "redis": {"url": "redis://localhost:6379"}}
+
+
+class LLMInterface(BaseConfig):
     """
-    Setup backend engines.
+    Setup LLM backend engines.
     """
 
     # Define the default models, can be overridden by config.yaml
@@ -21,13 +36,8 @@ class Config:
     DEFAULT_MODEL_FILENAME = "mistral-7b-instruct-v0.1.Q4_K_M.gguf"
     DEFAULT_MODEL_CTX = 4096
 
-    def __init__(self, config_path='config.yaml'):
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as file:
-                self.config = yaml.load(file, Loader=yaml.FullLoader)
-        else:
-            warnings.warn(f"Config file not found: {config_path}. Using default config.")
-            self.config = {"llm_chat": {"type": "LlamaCpp"}, "llm_completion": {"type": "LlamaCpp"}}
+    def __init__(self, config_file='config.yaml'):
+        super().__init__(config_file)
         # use dummy context by default except for OpenAI:
         self.unified_instruction = self.dummy_context
         # Load the model based on the configuration
@@ -74,60 +84,35 @@ class Config:
                 return models.LlamaCpp(model_path, n_gpu_layers=int(backend_config.get('n_gpu_layers', 0)),
                                        n_ctx=self.DEFAULT_MODEL_CTX)
 
-    # def process_input(self, input_text):
-    #     # Ensures the model is loaded
-    #     if self.model is None:
-    #         raise Exception("Model is not loaded. Please check the configuration.")
-    #
-    #     if self.mode == 'chat':
-    #         from guidance import system, user, assistant
-    #
-    #         with system():
-    #             response = self.model + "You are a helpful assistant."
-    #
-    #         with user():
-    #             response += f'{input_text} '
-    #
-    #         with assistant():
-    #             response += gen("answer", stop=".")
-    #
-    #     elif self.mode == 'instruct':
-    #         from guidance import instruction
-    #
-    #         with instruction():
-    #             response = self.model + f'{input_text} '
-    #         response += gen(stop=".")
-    #     else:  # self.mode == 'completion'
-    #         response = self.model + f'{input_text} ' + gen(stop='.')
-    #
-    #     # Further processing could include parsing the response for intents, entities, etc.
-    #     # ...
-    #
-    #     return response
 
-        # Process the input using the loaded model
-        # The actual processing method may depend on the model you have
-        # results = self.model.process(input_text)
+class RedisConfig(BaseConfig):
+    """
+    Setup Redis backend engines.
+    """
 
-        # Additional processing to parse intents and entities can be added here
-        # This is placeholder logic and should be customized based on model output
-        # intents = parse_intents(results)
-        # entities = parse_entities(results)
+    def __init__(self, config_file='config.yaml'):
+        super().__init__(config_file)
+        # Load the model based on the configuration
+        self.redis_url = self.config.get("redis", {}).get("url", "redis://localhost:6379")
+        if self.redis_url.startswith("rediss://"):
+            import base64
+            import tempfile
+            cert_base64 = self.config["redis"].get('certificate_base64', None)
+            if cert_base64 is None:
+                raise ValueError("rediss:// url needs certificate_base64 in config.yaml")
+            # Decode the base64-encoded certificate
+            cert_decoded = base64.b64decode(cert_base64)
+            # Write the certificate to a temporary file
+            with tempfile.NamedTemporaryFile(delete=False) as temp_cert_file:
+                temp_cert_file.write(cert_decoded)
+                self.ssl_ca_certs = temp_cert_file.name
+                self.ssl = True
+        else:
+            self.ssl = False
+            self.ssl_ca_certs = None
 
-        # Here you would return structured data based on intents and entities
-        # return {
-        #     'intents': intents,
-        #     'entities': entities,
-        # }
-
-
-# Example usage:
-# import datetime
-# a = datetime.datetime.now()
-# nlu_interface = NLUInterface(config_path='config.yaml')
-# prompt = "What's the weather like today?"
-# nlu_results = nlu_interface.process_input(prompt)
-# b = datetime.datetime.now()
-# c = b - a
-# print(nlu_results)
-# print(c.total_seconds())
+    def __del__(self):
+        # Delete the temporary certificate file
+        # TODO: it depends on the Python garbage collector which can be unpredictable.
+        if self.ssl_ca_certs is not None:
+            os.remove(self.ssl_ca_certs)
