@@ -22,7 +22,8 @@ setup(
         'redis',
         'redisvl',
         'jsonpath-ng',
-        'sentence-transformers'
+        'sentence-transformers',
+        'pydantic'
         # Add here any dependencies your package needs, e.g.,
         # 'spacy>=3.0', 'transformers>=4.0'
     ],

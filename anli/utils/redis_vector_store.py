@@ -7,7 +7,7 @@ from uuid import uuid4
 
 class RedisVectorStoreForJSON:
     def __init__(self, index_name, default_semantic_distance_threshold=0.1,
-                 redis_url="redis://localhost:6379", vectorizer=None):
+                 redis_url="redis://localhost:6379", vectorizer=None, **kwargs):
         """
         Creates a RedisVectorStoreForJSON object.
         :param index_name:
@@ -17,7 +17,7 @@ class RedisVectorStoreForJSON:
         Otherwise, use the provided vectorizer. We suggest to use "jinaai/jina-embeddings-v2-base-en" for English,
         but trust_remote_code=true is not supported yet. https://github.com/UKPLab/sentence-transformers/issues/2352
         """
-        self.client = redis.Redis.from_url(redis_url, decode_responses=False)
+        self.client = redis.Redis.from_url(redis_url, decode_responses=False, **kwargs)
         self.index_name = index_name
         self.redis_url = redis_url
         self.default_semantic_distance_threshold = default_semantic_distance_threshold
@@ -27,7 +27,8 @@ class RedisVectorStoreForJSON:
                 name=f"{self.index_name}_vector_index",                     # underlying search index name
                 prefix=f"{self.index_name}_vector_index:item",              # redis key prefix
                 redis_url=self.redis_url,  # redis connection url string
-                distance_threshold=self.default_semantic_distance_threshold               # semantic distance threshold
+                distance_threshold=self.default_semantic_distance_threshold,               # semantic distance threshold
+                **kwargs
             )
         else:
             self.vector_index = SemanticCache(
@@ -35,7 +36,8 @@ class RedisVectorStoreForJSON:
                 prefix=f"{self.index_name}_vector_index:item",              # redis key prefix
                 redis_url=self.redis_url,  # redis connection url string
                 vectorizer=self.vectorizer,
-                distance_threshold=self.default_semantic_distance_threshold               # semantic distance threshold
+                distance_threshold=self.default_semantic_distance_threshold,               # semantic distance threshold
+                **kwargs
             )
 
     def upsert_item(self, json_data: dict,
@@ -106,6 +108,53 @@ class RedisVectorStoreForJSON:
         else:
             return f"Upsert {diff} objects to JSON_store, skipped vector_index."
 
+    def search_item(self, query, num_results=1, return_fields=["response", "name", "path", "vector_distance"],
+                    semantic_distance_threshold=None):
+        if semantic_distance_threshold is not None:
+            self.vector_index.set_threshold(semantic_distance_threshold)
+
+        res = self.vector_index.check(prompt=query, num_results=num_results, return_fields=return_fields)
+
+        if semantic_distance_threshold is not None:
+            self.vector_index.set_threshold(self.default_semantic_distance_threshold)
+
+        return res
+
+    def set_default_semantic_distance_threshold(self, threshold):
+        self.default_semantic_distance_threshold = threshold
+        self.vector_index.set_threshold(threshold)
+
+    def set_vectorizer(self, vectorizer):
+        self.vectorizer = vectorizer
+        self.vector_index = SemanticCache(
+            name=f"{self.index_name}_vector_index",  # underlying search index name
+            prefix=f"{self.index_name}_vector_index:item",  # redis key prefix
+            redis_url=self.redis_url,  # redis connection url string
+            vectorizer=self.vectorizer,
+            distance_threshold=self.default_semantic_distance_threshold  # semantic distance threshold
+        )
+
+    def clear_index(self):
+        """
+        Clear the vector index.
+        :return:
+        """
+        self.vector_index.clear()
+
+    def delete_index(self):
+        # Remove the underlying index
+        self.vector_index.index.delete(drop=True)
+
+    def __len__(self):
+        return self.client.scard(f"{self.index_name}-collections")
+
+    def __iter__(self):
+        for key in self.client.smembers(f"{self.index_name}-collections"):
+            yield key
+
+    def __getitem__(self, item):
+        return self.client.json().get(f"{self.index_name}-{item}")
+
     @staticmethod
     def extract_prompt_response_pairs(json_data, prompt_path, response_relative_position=None):
         """
@@ -155,50 +204,42 @@ class RedisVectorStoreForJSON:
 
         return pairs
 
-    def search_item(self, query, num_results=1, return_fields=["response", "name", "path", "vector_distance"],
-                    semantic_distance_threshold=None):
-        if semantic_distance_threshold is not None:
-            self.vector_index.set_threshold(semantic_distance_threshold)
-
-        res = self.vector_index.check(prompt=query, num_results=num_results, return_fields=return_fields)
-
-        if semantic_distance_threshold is not None:
-            self.vector_index.set_threshold(self.default_semantic_distance_threshold)
-
-        return res
-
-    def set_default_semantic_distance_threshold(self, threshold):
-        self.default_semantic_distance_threshold = threshold
-        self.vector_index.set_threshold(threshold)
-
-    def set_vectorizer(self, vectorizer):
-        self.vectorizer = vectorizer
-        self.vector_index = SemanticCache(
-            name=f"{self.index_name}_vector_index",  # underlying search index name
-            prefix=f"{self.index_name}_vector_index:item",  # redis key prefix
-            redis_url=self.redis_url,  # redis connection url string
-            vectorizer=self.vectorizer,
-            distance_threshold=self.default_semantic_distance_threshold  # semantic distance threshold
-        )
-
-    def clear_index(self):
+    @staticmethod
+    def extract_utterances(redis_client, json_name, path, start_shift, end_shift):
         """
-        Clear the vector index.
-        :return:
+        Extracts a range of utterances from a RedisJSON object relative to the current index.
+
+        :param redis_client: The Redis client instance.
+        :param json_name: The name of the JSON object in Redis.
+        :param path: The path to the current utterance in the RedisJSON object.
+        :param start_shift: The start of the range relative to the current index.
+        :param end_shift: The end of the range relative to the current index.
+        :return: A list of utterances or None for indices out of boundary.
         """
-        self.vector_index.clear()
+        try:
+            # Extract the base path and current index from the path
+            path_parts = path.split('[')
+            # Assuming index is in the rightmost part of the path
+            current_index = int(path_parts[-1].split(']')[0])
+            # everything before the last part is the base path
+            base_path = '['.join(path_parts[:-1]).rstrip('.')
 
-    def delete_index(self):
-        # Remove the underlying index
-        self.vector_index.index.delete(drop=True)
+            # Fetch the conversation from the base path, since the path should have no wildcards,
+            # this should return a list of 1
+            conversation = redis_client.json().get(json_name, base_path)[0]
 
-    def __len__(self):
-        return self.client.scard(f"{self.index_name}-collections")
+            # Calculate the range of indexes
+            start_index, end_index = (max(current_index + start_shift, 0),
+                                      min(current_index + end_shift, len(conversation)))
 
-    def __iter__(self):
-        for key in self.client.smembers(f"{self.index_name}-collections"):
-            yield key
+            # Extract the relevant utterances
+            utterances = []
+            for i in range(start_index, end_index):
+                utterances.append(conversation[i])
 
-    def __getitem__(self, item):
-        return self.client.json().get(f"{self.index_name}-{item}")
+            return utterances
 
+        except IndexError as e:
+            import warnings
+            warnings.warn(f"Index out of boundary when extracting utterances: {e}")
+            return []
