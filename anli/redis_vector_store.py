@@ -1,5 +1,4 @@
 import redis
-import json
 from redisvl.llmcache import SemanticCache
 from jsonpath_ng.ext import parse
 from jsonpath_ng import Index, Child
@@ -7,50 +6,105 @@ from uuid import uuid4
 
 
 class RedisVectorStoreForJSON:
-    def __init__(self, index_name, js_paths, default_semantic_distance_threshold=0.1,
-                 redis_url="redis://localhost:6379"):
-        self.client = redis.Redis.from_url(redis_url, decode_responses=True)
+    def __init__(self, index_name, default_semantic_distance_threshold=0.1,
+                 redis_url="redis://localhost:6379", vectorizer=None):
+        """
+        Creates a RedisVectorStoreForJSON object.
+        :param index_name:
+        :param default_semantic_distance_threshold:
+        :param redis_url:
+        :param vectorizer: If None, use the default HFTextVectorizer ("sentence-transformers/all-mpnet-base-v2").
+        Otherwise, use the provided vectorizer. We suggest to use "jinaai/jina-embeddings-v2-base-en" for English,
+        but trust_remote_code=true is not supported yet. https://github.com/UKPLab/sentence-transformers/issues/2352
+        """
+        self.client = redis.Redis.from_url(redis_url, decode_responses=False)
         self.index_name = index_name
+        self.redis_url = redis_url
         self.default_semantic_distance_threshold = default_semantic_distance_threshold
-        self.vector_index = SemanticCache(
-            name=f"{index_name}_vector_index",                     # underlying search index name
-            prefix=f"{index_name}_vector_index:item",              # redis key prefix
-            redis_url=redis_url,  # redis connection url string
-            distance_threshold=self.default_semantic_distance_threshold               # semantic distance threshold
-        )
+        self.vectorizer = vectorizer
+        if self.vectorizer is None:
+            self.vector_index = SemanticCache(
+                name=f"{self.index_name}_vector_index",                     # underlying search index name
+                prefix=f"{self.index_name}_vector_index:item",              # redis key prefix
+                redis_url=self.redis_url,  # redis connection url string
+                distance_threshold=self.default_semantic_distance_threshold               # semantic distance threshold
+            )
+        else:
+            self.vector_index = SemanticCache(
+                name=f"{self.index_name}_vector_index",                     # underlying search index name
+                prefix=f"{self.index_name}_vector_index:item",              # redis key prefix
+                redis_url=self.redis_url,  # redis connection url string
+                vectorizer=self.vectorizer,
+                distance_threshold=self.default_semantic_distance_threshold               # semantic distance threshold
+            )
 
     def upsert_item(self, json_data: dict,
                     json_prompt_paths: [str] = None,
                     response_relative_position: int = None,
-                    json_data_id: str = None,
-                    index_path: str = '$'):
+                    json_storage_id_suffix: str = None,
+                    json_storage_path: str = '$'):
         """
-        upsert a JSON object in Redis and index its vector representations
-        :param json_data: The JSON object to store
-        :param json_prompt_paths: The paths to extract prompts from the JSON object and index. If None, skip indexing
-        step. Setting it to None can be useful for update or store JSON values without changing the index.
-        :param response_relative_position: The relative position of the response to the prompt. Defaults to None,
-        which will store an empty string as the response.
-        :param json_data_id: The ID of the JSON object. If None, generate a UUID. If you want to update an existing
-        object, you need to specify the ID.
-        :param index_path: The path to store the JSON object in Redis. Defaults to '$' (root). If need to update a
-        subpath of the JSON object, specify the path here.
-        :return: None
+        Inserts or updates a JSON object in Redis and optionally indexes its vector representations.
+        Stores the JSON object in Redis at 'json_storage_path' in "{self.index_name}-{json_storage_id_suffix}" and
+        indexes prompts and responses. The JSONPath for retrieving the prompt from RedisJSON is stored in the vector
+        index under "path", and the JSON object ID is stored under "name".
+
+        :param json_data: The JSON object to be stored.
+        :param json_prompt_paths: A string or list of JSONPath expressions to extract prompts for indexing.
+                                  If a string is provided, it is treated as a single path.
+                                  If None, the indexing step is skipped.
+                                  IMPORTANT: These paths are relative to the root of 'json_data'.
+        :param response_relative_position: The relative position of the response to the prompt within a conversation.
+                                           If set to None, responses are stored as empty strings. This is useful for
+                                           indexing non-conversational JSON objects where a corresponding response
+                                           may not exist.
+        :param json_storage_id_suffix: This suffix is appended to index_name to construct a unique identifier for the
+                                       JSON object in redis. A new UUID is generated if None.
+                                       Specify this to update an existing object.
+        :param json_storage_path: (Optional) Path in Redis where the JSON object is stored. Defaults to the root ('$').
+                                  Specify this to store or update the JSON object at a specific subpath.
+        :return: str - A message indicating the number of objects upserted.
         """
-        if json_data_id is None:
-            json_data_id = str(uuid4())
-        self.client.json().set(f"{self.index_name}-{json_data_id}", index_path, json_data)
-        # Adding the item to the tracking set
-        self.client.sadd(f"{self.index_name}-collections", json_data_id)
+        # Set or generate the JSON object ID
+        if json_storage_id_suffix is None:
+            json_storage_id_suffix = str(uuid4())
+
+        # Store the JSON object in Redis
+        self.client.json().set(f"{self.index_name}-{json_storage_id_suffix}", json_storage_path, json_data)
+
+        l = self.client.scard(f"{self.index_name}-collections")
+        # Track the JSON object ID in a Redis set
+        self.client.sadd(f"{self.index_name}-collections", json_storage_id_suffix)
+
+        diff = self.client.scard(f"{self.index_name}-collections") - l
+
+        # Convert json_prompt_paths to a list if it's a string
+        if isinstance(json_prompt_paths, str):
+            json_prompt_paths = [json_prompt_paths]
+
+        # Index prompts and responses if paths are provided
         if json_prompt_paths is not None:
+            count = 0
             for prompt_path in json_prompt_paths:
+                # Extract prompt-response pairs based on the provided path and position
                 pairs = self.extract_prompt_response_pairs(json_data, prompt_path,
                                                            response_relative_position=response_relative_position)
-                for prompt, response in pairs:
+                # Store each pair's vector representation
+                for prompt, response, p in pairs:
+                    # Remove leading '$' from prompt_path if present
+                    formatted_prompt_path = p.lstrip('$.')
+
+                    # Merge paths
+                    stored_path = f"{json_storage_path}.{formatted_prompt_path}"
+
                     self.vector_index.store(prompt=prompt,
                                             response=response,
-                                            metadata={"name": f"{self.index_name}-{json_data_id}",
-                                                      "path": f"{index_path}.{prompt_path}"})
+                                            metadata={"name": f"{self.index_name}-{json_storage_id_suffix}",
+                                                      "path": stored_path})
+                    count += 1
+            return f"Upsert {diff} objects to JSON_store and {count} prompts to vector_index."
+        else:
+            return f"Upsert {diff} objects to JSON_store, skipped vector_index."
 
     @staticmethod
     def extract_prompt_response_pairs(json_data, prompt_path, response_relative_position=None):
@@ -58,7 +112,8 @@ class RedisVectorStoreForJSON:
         Extracts pairs of prompts and responses from a given JSON structure based on provided JSONPath for prompts.
 
         Parameters:
-        - json_data: The JSON data containing the conversation. We are assuming the JSON structure is an OpenAI messages JSON format, i.e.:
+        - json_data: The JSON data containing the conversation. We are assuming the JSON structure is an OpenAI messages
+         JSON format, i.e.:
         [
             {role: "patient", content: "I'm feeling unwell..."},
             {role: "doctor", content: "What symptoms..."},
@@ -96,66 +151,54 @@ class RedisVectorStoreForJSON:
                 # If no response position is provided, set response to empty
                 response_content = ''
 
-            pairs.append((prompt_text, response_content))
+            pairs.append((prompt_text, response_content, str(prompt.full_path)))
 
         return pairs
 
+    def search_item(self, query, num_results=1, return_fields=["response", "name", "path", "vector_distance"],
+                    semantic_distance_threshold=None):
+        if semantic_distance_threshold is not None:
+            self.vector_index.set_threshold(semantic_distance_threshold)
 
-    def search_item(self, query, num_results=1, semantic_distance_threshold=None):
-        # Check the cache again to see if new answer is there
-        self.vector_index.check(prompt=query, num_results=num_results,)
-        return self.client.json().get(f"{self.index_name}-{json_data_id}", '$')
+        res = self.vector_index.check(prompt=query, num_results=num_results, return_fields=return_fields)
+
+        if semantic_distance_threshold is not None:
+            self.vector_index.set_threshold(self.default_semantic_distance_threshold)
+
+        return res
+
+    def set_default_semantic_distance_threshold(self, threshold):
+        self.default_semantic_distance_threshold = threshold
+        self.vector_index.set_threshold(threshold)
+
+    def set_vectorizer(self, vectorizer):
+        self.vectorizer = vectorizer
+        self.vector_index = SemanticCache(
+            name=f"{self.index_name}_vector_index",  # underlying search index name
+            prefix=f"{self.index_name}_vector_index:item",  # redis key prefix
+            redis_url=self.redis_url,  # redis connection url string
+            vectorizer=self.vectorizer,
+            distance_threshold=self.default_semantic_distance_threshold  # semantic distance threshold
+        )
+
+    def clear_index(self):
+        """
+        Clear the vector index.
+        :return:
+        """
+        self.vector_index.clear()
+
+    def delete_index(self):
+        # Remove the underlying index
+        self.vector_index.index.delete(drop=True)
 
     def __len__(self):
         return self.client.scard(f"{self.index_name}-collections")
 
+    def __iter__(self):
+        for key in self.client.smembers(f"{self.index_name}-collections"):
+            yield key
 
-    def append_item(self, json_paths, json_data, index_path='$'):
-        self.client.json().arrappend(self.index_name, index_path, json_data)
-        for path in json_paths:
-            jsonpath_expr = jsonpath_ng.parse(path)
-            for match in jsonpath_expr.find(json_data):
-                content = match.value
-                self.vector_index.store(prompt=content, response=f"{index_path}.{str(match.full_path)}")
+    def __getitem__(self, item):
+        return self.client.json().get(f"{self.index_name}-{item}")
 
-    def _vectorize_content(self, content):
-        return self.embedder.embed(content)
-
-    def _extract_and_vectorize(self, json_data, reference):
-        vectors = []
-        for path in self.vector_paths:
-            jsonpath_expr = jsonpath_ng.parse(path)
-            for match in jsonpath_expr.find(json_data):
-                content = match.value
-                location = json.dumps({"reference": reference, "path": str(match.full_path)})
-                vector = self._vectorize_content(content)
-                vectors.append({"vector": vector, "location": location})
-        return vectors
-
-    def store_json(self, json_data, reference):
-        vectors = self._extract_and_vectorize(json_data, reference)
-        for vector_data in vectors:
-            self.client.json().set(f"{self.index_name}:{reference}", "$", vector_data)
-
-    def search_vectors(self, query, top_k=3):
-        query_vector = self._vectorize_content(query)
-        # Add logic to search for similar vectors in Redis
-        # Return top_k results along with their locations
-
-# Usage example
-vector_paths = ["$.conversation[?(@.role == 'patient')].content"]
-store = RedisVectorStoreForJSON("redis://localhost:6379", "patient_utterances", vector_paths, "sentence-transformers-model-name")
-
-user_chat = {
-    "patient_profile": "Patient background...",
-    "conversation": [
-        {"role": "patient", "content": "I'm feeling unwell..."},
-        {"role": "doctor", "content": "What symptoms..."},
-        {"role": "patient", "content": "I have a headache..."}
-        # ... more conversation entries ...
-    ]
-}
-
-store.store_json(user_chat, "chat1")
-# For searching similar vectors
-results = store.search_vectors("I have a fever", top_k=5)
