@@ -1,5 +1,7 @@
 # Application Natural Language Interface (ANLI)
 
+<img src="assets/logo.png" alt="ANLI Logo" style="max-width: 256px; width: 25%;">
+
 ANLI is a Python package designed to enable developers to wrap their applications and tools with a natural language interface. It leverages Large Language Models (LLMs) to process unstructured natural language input into structured commands, allowing both humans and AI agents to interact intuitively with software components.
 
 ## Installation
