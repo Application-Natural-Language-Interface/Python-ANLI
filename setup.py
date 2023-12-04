@@ -22,7 +22,9 @@ setup(
         'redis',
         'redisvl',
         'jsonpath-ng',
-        'sentence-transformers',
+        'text-transformers',  # drop in replacement for sentence_transformers until the trust_remote_code=true is
+        # supported https://huggingface.co/jinaai/jina-embeddings-v2-small-en/discussions/10
+        # 'sentence-transformers',
         'pydantic'
         # Add here any dependencies your package needs, e.g.,
         # 'spacy>=3.0', 'transformers>=4.0'
