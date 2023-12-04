@@ -53,7 +53,7 @@ Execute the script by typing `.\install_windows.ps1` and pressing Enter.
 
 - redis
     ```bash
-    docker run -d -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
+    docker run -d -p 6379:6379 redis/redis-stack:latest
     ```
 
 ## Models
@@ -62,7 +62,7 @@ We provide a default model based on
 [Mistral 7B Instruct v0.1](https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF), 
 and use llama.cpp to run inference on the model.
 
-You can load other models by providing a config.yaml file, and load it with `NLUInterface(config_path='config.yaml')`
+You can load other models by providing a config.yaml file, and load it with `LLMInterface(config_file='config.yaml')`
 
 You can use HF Transformer instead of llama.cpp. But you need to do `pip install anli[transformer]` 
 (or `pip install -e .[transformer]`) to install the dependencies.
