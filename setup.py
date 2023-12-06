@@ -4,14 +4,19 @@ import subprocess
 # noted that some of the dependencies are not included in the setup.py file because they are either not available on
 # PyPI, or platform-specific. Please run the appropriate script in the install_scripts folder.
 
-def run_script():
-    if os.name == 'nt':  # Windows
-        subprocess.call(['powershell.exe', './install_scripts/install_windows.ps1'])
-    else:  # macOS and Linux
-        subprocess.call(['./install_scripts/install_linux_macos.sh'])
+if os.name == 'nt':  # Windows
+    result = subprocess.run(['powershell.exe', '-File', './install_scripts/install_windows.ps1'], capture_output=True, text=True)
+else:  # macOS and Linux
+    result = subprocess.run(['bash', '-c', 'source ./install_scripts/install_linux_macos.sh && echo $CMAKE_ARGS'],
+                            capture_output=True, text=True, shell=True)
 
-# Call the script
-run_script()
+# Extract the environment variable from the output
+env_var_value = result.stdout.strip()
+
+# Set the environment variable in the main Python process
+os.environ['$CMAKE_ARGS'] = env_var_value
+
+print(f"Setting CMAKE_ARGS={env_var_value}")
 
 setup(
     name='Python-ANLI',

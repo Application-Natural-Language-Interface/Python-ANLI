@@ -34,3 +34,6 @@ foreach ($gpu in $gpus) {
 Write-Host "Installing dependencies for Windows..."
 
 Write-Host "See https://github.com/abetlen/llama-cpp-python#windows-remarks for more instructions if you run into problems."
+
+# Output the environment variable
+Write-Output $Env:CMAKE_ARGS
