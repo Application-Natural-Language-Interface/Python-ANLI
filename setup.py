@@ -18,6 +18,7 @@ setup(
         'appdirs>=1.4.4',
         'huggingface_hub[cli]',
         'langchain',
+        'llama-index',
         'duckduckgo-search',
         'redis',
         'redisvl',

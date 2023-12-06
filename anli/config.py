@@ -2,14 +2,16 @@ import logging
 import warnings
 import yaml
 import os
-from huggingface_hub import hf_hub_download
-from guidance import models, instruction
 from contextlib import contextmanager
-from .utils import RedisVectorStoreForJSON
 
 # Define package metadata, Constants
 APP_NAME = 'Python-ANLI'  # this will be used as the AppName of the package
 ORGANIZATION = 'ANLI'  # this will be used as appauthor in appdirs
+
+# Define the default models, can be overridden by config.yaml
+DEFAULT_MODEL_IDENTIFIER = "TheBloke/Mistral-7B-Instruct-v0.1-GGUF"
+DEFAULT_MODEL_FILENAME = "mistral-7b-instruct-v0.1.Q4_K_M.gguf"
+DEFAULT_MODEL_CTX = 4096
 
 
 class BaseConfig:
@@ -31,10 +33,6 @@ class LLMInterface(BaseConfig):
     Setup LLM backend engines.
     """
 
-    # Define the default models, can be overridden by config.yaml
-    DEFAULT_MODEL_IDENTIFIER = "TheBloke/Mistral-7B-Instruct-v0.1-GGUF"
-    DEFAULT_MODEL_FILENAME = "mistral-7b-instruct-v0.1.Q4_K_M.gguf"
-    DEFAULT_MODEL_CTX = 4096
 
     def __init__(self, config_file='config.yaml'):
         super().__init__(config_file)
@@ -49,6 +47,8 @@ class LLMInterface(BaseConfig):
         yield
 
     def load_model(self, mode):
+        from huggingface_hub import hf_hub_download
+        from guidance import models, instruction
         # Determine which model class to use based on config
         backend_config = self.config.get(mode, {})
         backend_type = backend_config.get('type')
@@ -62,27 +62,35 @@ class LLMInterface(BaseConfig):
                 return models.Transformers(backend_config['model'])
         elif backend_type == 'OpenAI':
             if mode == "llm_chat":
+                from langchain.llms import OpenAIChat as LC_OpenAIChat
+                from llama_index.llms import Open
                 logging.debug(f"loading chat model: {backend_config['model']}")
                 return models.OpenAI(backend_config['model'], api_key=backend_config['api_key'])
             else:
+                from langchain.llms import OpenAI as LC_OpenAI
+                from llama_index.llms import OpenAI as LI_OpenAI
                 # if we use OpenAI for completion, we need to use the instruction context:
                 self.unified_instruction = instruction
                 logging.debug(f"loading completion model: {backend_config['model']}")
                 return models.OpenAI(backend_config['model'], api_key=backend_config['api_key'])
         else:
+            from langchain.llms import LlamaCpp as LC_LlamaCpp
+            from llama_index.llms import LlamaCPP as LI_LlamaCpp
             if backend_type != 'LlamaCpp':
                 warnings.warn(f"Unsupported LLM backend type: {backend_type}. Using default: LlamaCpp")
-            identifier = backend_config.get('identifier', self.DEFAULT_MODEL_IDENTIFIER)
-            filename = backend_config.get('filename', self.DEFAULT_MODEL_FILENAME)
+            identifier = backend_config.get('identifier', DEFAULT_MODEL_IDENTIFIER)
+            filename = backend_config.get('filename', DEFAULT_MODEL_FILENAME)
             model_path = hf_hub_download(repo_id=identifier, filename=filename)
+            from anli.llms import CombinedLlamaCpp
+            return CombinedLlamaCpp(model_path)
             if mode == "llm_chat":
                 logging.debug(f"loading chat model: {identifier}-{filename}")
                 return models.LlamaCppChat(model_path, n_gpu_layers=int(backend_config.get('n_gpu_layers', 0)),
-                                           n_ctx=self.DEFAULT_MODEL_CTX)
+                                           n_ctx=DEFAULT_MODEL_CTX)
             else:
                 logging.debug(f"loading completion model: {identifier}-{filename}")
                 return models.LlamaCpp(model_path, n_gpu_layers=int(backend_config.get('n_gpu_layers', 0)),
-                                       n_ctx=self.DEFAULT_MODEL_CTX)
+                                       n_ctx=DEFAULT_MODEL_CTX)
 
 
 class RedisConfig(BaseConfig):
