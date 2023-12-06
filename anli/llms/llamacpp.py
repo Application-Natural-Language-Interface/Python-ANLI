@@ -19,7 +19,7 @@ class CombinedLlamaCpp:
         klc["model_path"] = model_path
         if lc_kwargs is not None:
             klc.update(lc_kwargs)
-        self.LC_model = LC_LlamaCpp(**klc)
+        self.LC_llm = LC_LlamaCpp(**klc)
 
         dummy_model_path = hf_hub_download(repo_id=DEFAULT_MODEL_IDENTIFIER, filename=DEFAULT_MODEL_FILENAME)
 
@@ -29,11 +29,11 @@ class CombinedLlamaCpp:
             kli = {}
         kli["model_kwargs"] = {"n_gpu_layers": 0}
         # We will first load a dummy model on cpu to get the model config
-        self.LI_model = LI_LlamaCpp(model_path=dummy_model_path, **kli)
+        self.LI_llm = LI_LlamaCpp(model_path=dummy_model_path, **kli)
         # Then we will replace it with the actual model on the gpu:
-        del self.LI_model._model
-        self.LI_model._model = self.LC_model.client
+        del self.LI_llm._model
+        self.LI_llm._model = self.LC_llm.client
 
         # guidance can load model object directly:
-        self.GU_model = models.LlamaCpp(self.LC_model.client)
-        self.GU_model_chat = models.LlamaCppChat(self.LC_model.client)
+        self.GU_llm = models.LlamaCpp(self.LC_llm.client)
+        self.GU_chat = models.LlamaCppChat(self.LC_llm.client)

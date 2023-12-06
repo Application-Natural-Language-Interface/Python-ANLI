@@ -12,19 +12,20 @@ ORGANIZATION = 'ANLI'  # this will be used as appauthor in appdirs
 DEFAULT_MODEL_IDENTIFIER = "TheBloke/Mistral-7B-Instruct-v0.1-GGUF"
 DEFAULT_MODEL_FILENAME = "mistral-7b-instruct-v0.1.Q4_K_M.gguf"
 DEFAULT_MODEL_CTX = 4096
-
+DEFAULT_N_GPU_LAYERS = 0
 
 class BaseConfig:
     """Base configuration class for the package"""
 
-    def __init__(self, config_file='config.yaml'):
-        if os.path.exists(config_file):
+    def __init__(self, config_file='config.yaml', config=None):
+        if config is not None:
+            self.config = config
+        elif os.path.exists(config_file):
             with open(config_file, 'r') as file:
                 self.config = yaml.load(file, Loader=yaml.FullLoader)
         else:
             warnings.warn(f"Config file not found: {config_file}. Using default config.")
-            self.config = {"llm_chat": {"type": "LlamaCpp"},
-                           "llm_completion": {"type": "LlamaCpp"},
+            self.config = {"llm": {"n_gpu_layers": 0},
                            "redis": {"url": "redis://localhost:6379"}}
 
 
@@ -34,63 +35,51 @@ class LLMInterface(BaseConfig):
     """
 
 
-    def __init__(self, config_file='config.yaml'):
-        super().__init__(config_file)
-        # use dummy context by default except for OpenAI:
-        self.unified_instruction = self.dummy_context
+    def __init__(self, config_file='config.yaml', config=None):
+        super().__init__(config_file=config_file, config=config)
         # Load the model based on the configuration
-        self.model_chat = self.load_model("llm_chat")
-        self.model_completion = self.load_model("llm_completion")
+        self.model_path = None
+        self.models = self.load_model()
 
-    @contextmanager
-    def dummy_context(self):
-        yield
-
-    def load_model(self, mode):
+    def load_model(self):
         from huggingface_hub import hf_hub_download
         from guidance import models, instruction
         # Determine which model class to use based on config
-        backend_config = self.config.get(mode, {})
+        backend_config = self.config.get('llm', {})
         backend_type = backend_config.get('type')
 
         if backend_type == 'Transformers':
-            if mode == "llm_chat":
-                logging.debug(f"loading chat model: {backend_config['model']}")
-                return models.TransformersChat(backend_config['model'])
-            else:
-                logging.debug(f"loading completion model: {backend_config['model']}")
-                return models.Transformers(backend_config['model'])
+            logging.debug(f"loading chat model: {backend_config['model']}")
+            return models.TransformersChat(backend_config['model'])
         elif backend_type == 'OpenAI':
-            if mode == "llm_chat":
-                from langchain.llms import OpenAIChat as LC_OpenAIChat
-                from llama_index.llms import Open
-                logging.debug(f"loading chat model: {backend_config['model']}")
-                return models.OpenAI(backend_config['model'], api_key=backend_config['api_key'])
-            else:
-                from langchain.llms import OpenAI as LC_OpenAI
-                from llama_index.llms import OpenAI as LI_OpenAI
-                # if we use OpenAI for completion, we need to use the instruction context:
-                self.unified_instruction = instruction
-                logging.debug(f"loading completion model: {backend_config['model']}")
-                return models.OpenAI(backend_config['model'], api_key=backend_config['api_key'])
+            return {
+                "GU_instruct":models.OpenAI(backend_config['instruct'], api_key=backend_config['api_key']),
+                "GU_chat":models.OpenAIChat(backend_config['chat'], api_key=backend_config['api_key']),
+            }
         else:
-            from langchain.llms import LlamaCpp as LC_LlamaCpp
-            from llama_index.llms import LlamaCPP as LI_LlamaCpp
             if backend_type != 'LlamaCpp':
-                warnings.warn(f"Unsupported LLM backend type: {backend_type}. Using default: LlamaCpp")
+                raise f"Unsupported LLM backend type: {backend_type}. Using default: LlamaCpp"
+            from .llms import CombinedLlamaCpp
+            from langchain.callbacks.manager import CallbackManager
+            from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+            from llama_index.llms.llama_utils import (
+                messages_to_prompt,
+                completion_to_prompt,
+            )
+            # This is for LangChain
+            # Callbacks support token-wise streaming
+            callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
+
             identifier = backend_config.get('identifier', DEFAULT_MODEL_IDENTIFIER)
             filename = backend_config.get('filename', DEFAULT_MODEL_FILENAME)
-            model_path = hf_hub_download(repo_id=identifier, filename=filename)
-            from anli.llms import CombinedLlamaCpp
-            return CombinedLlamaCpp(model_path)
-            if mode == "llm_chat":
-                logging.debug(f"loading chat model: {identifier}-{filename}")
-                return models.LlamaCppChat(model_path, n_gpu_layers=int(backend_config.get('n_gpu_layers', 0)),
-                                           n_ctx=DEFAULT_MODEL_CTX)
-            else:
-                logging.debug(f"loading completion model: {identifier}-{filename}")
-                return models.LlamaCpp(model_path, n_gpu_layers=int(backend_config.get('n_gpu_layers', 0)),
-                                       n_ctx=DEFAULT_MODEL_CTX)
+            n_gpu_layers = backend_config.get('n_gpu_layers', DEFAULT_N_GPU_LAYERS)
+            self.model_path = hf_hub_download(repo_id=identifier, filename=filename)
+            return CombinedLlamaCpp(model_path=self.model_path,
+                                    n_ctx=DEFAULT_MODEL_CTX,
+                                    n_gpu_layers=n_gpu_layers,
+                                    lc_kwargs={"callback_manager":callback_manager},
+                                    li_kwargs={"messages_to_prompt":messages_to_prompt,
+                                               "completion_to_prompt":completion_to_prompt})
 
 
 class RedisConfig(BaseConfig):
@@ -98,8 +87,8 @@ class RedisConfig(BaseConfig):
     Setup Redis backend engines.
     """
 
-    def __init__(self, config_file='config.yaml'):
-        super().__init__(config_file)
+    def __init__(self, config_file='config.yaml', config=None):
+        super().__init__(config_file=config_file, config=config)
         # Load the model based on the configuration
         self.redis_url = self.config.get("redis", {}).get("url", "redis://localhost:6379")
         if self.redis_url.startswith("rediss://"):

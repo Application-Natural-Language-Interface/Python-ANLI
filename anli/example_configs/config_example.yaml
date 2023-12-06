@@ -1,4 +1,4 @@
-llm_chat:
+llm:
   type: LlamaCpp
   identifier: TheBloke/Mistral-7B-Instruct-v0.1-GGUF  # Update with actual model identifier
   filename: mistral-7b-instruct-v0.1.Q4_K_M.gguf      # Update with actual model filename
@@ -8,18 +8,11 @@ llm_chat:
 #  model: mistralai/Mistral-7B-Instruct-v0.1
 
 #  type: OpenAI
-#  model: gpt-3.5-turbo-1106 # Replace with the model you want to use
+#  chat: gpt-3.5-turbo-1106 # Replace with the model you want to use
+#  instruct: gpt-3.5-turbo-instruct # Replace with the model you want to use
 #  api_key: YOUR_OPENAI_API_KEY  # Replace with your actual API key
 
-llm_completion:
-  type: LlamaCpp
-  identifier: TheBloke/Mistral-7B-Instruct-v0.1-GGUF  # Update with actual model identifier
-  filename: mistral-7b-instruct-v0.1.Q4_K_M.gguf      # Update with actual model filename
-  n_gpu_layers: -1 # -1 means all layers
-
-#  type: Transformers
-#  model: mistralai/Mistral-7B-Instruct-v0.1
-
-#  type: OpenAI
-#  model: gpt-3.5-turbo-instruct # Replace with the model you want to use
-#  api_key: YOUR_OPENAI_API_KEY  # Replace with your actual API key
+redis:
+  url: rediss://abc:abc@redis:6379/0
+  -2a8cfa90303f.c2f3lg8w0g8s0rkj98i0.databases.appdomain.cloud:30388/0
+  certificate_base64: "LS0tLS.."
