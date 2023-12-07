@@ -14,7 +14,7 @@ else:  # macOS and Linux
 env_var_value = result.stdout.strip()
 
 # Set the environment variable in the main Python process
-os.environ['$CMAKE_ARGS'] = env_var_value
+os.environ['CMAKE_ARGS'] = env_var_value
 
 print(f"Setting CMAKE_ARGS={env_var_value}")
 
