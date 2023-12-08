@@ -1,3 +1,18 @@
+import sys
+try:
+    from importlib.metadata import distribution
+except ImportError:
+    # For Python<3.8 compatibility
+    from importlib_metadata import distribution
+
+# Check if wheel is installed
+try:
+    distribution('wheel')
+except:
+    print("The 'wheel' package is not installed. "
+          "Please install 'wheel' to ensure a more reliable installation process.")
+    sys.exit(1)
+
 from setuptools import setup, find_packages
 import os
 import subprocess
