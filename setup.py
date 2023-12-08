@@ -40,7 +40,7 @@ setup(
         # supported https://huggingface.co/jinaai/jina-embeddings-v2-small-en/discussions/10
         # 'sentence-transformers',
         'pydantic',
-        'llama-cpp-python[server]',
+        'llama-cpp-python[server]==0.2.20',
         'torch',
         'torchvision',
         'torchaudio',
