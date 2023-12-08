@@ -6,7 +6,10 @@ import subprocess
 
 if os.name == 'nt':  # Windows
     result = subprocess.run(['powershell.exe', '-File', './install_scripts/install_windows.ps1'], capture_output=True, text=True)
-
+    # Extract the environment variable from the output
+    env_var_value = result.stdout.strip()
+    os.system('$env:CMAKE_GENERATOR = "MinGW Makefiles"')
+    os.system(f'$env:CMAKE_ARGS = "{env_var_value}"')
 else:  # macOS and Linux
     result = subprocess.run(['bash', '-c', 'source ./install_scripts/install_linux_macos.sh && echo $CMAKE_ARGS'],
                             capture_output=True, text=True, shell=True)
@@ -28,10 +31,10 @@ setup(
     packages=find_packages(),
     install_requires=[
         'guidance>=0.1',
-        'appdirs>=1.4.4',
-        'huggingface_hub[cli]==0.19.4',
-        'langchain==0.0.345',
-        'llama-index==0.9.12',
+        'appdirs',
+        'huggingface_hub[cli]',
+        'langchain',
+        'llama-index',
         'duckduckgo-search',
         'redis',
         'redisvl>=0.0.5',
@@ -39,8 +42,7 @@ setup(
         'text-transformers',  # drop in replacement for sentence_transformers until the trust_remote_code=true is
         # supported https://huggingface.co/jinaai/jina-embeddings-v2-small-en/discussions/10
         # 'sentence-transformers',
-        'pydantic',
-        'llama-cpp-python[server]==0.2.20',
+        'llama-cpp-python[server]',
         'torch',
         'torchvision',
         'torchaudio',
