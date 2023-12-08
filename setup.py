@@ -6,17 +6,15 @@ import subprocess
 
 if os.name == 'nt':  # Windows
     result = subprocess.run(['powershell.exe', '-File', './install_scripts/install_windows.ps1'], capture_output=True, text=True)
+
 else:  # macOS and Linux
     result = subprocess.run(['bash', '-c', 'source ./install_scripts/install_linux_macos.sh && echo $CMAKE_ARGS'],
                             capture_output=True, text=True, shell=True)
+    # Extract the environment variable from the output
+    env_var_value = result.stdout.strip()
+    os.system(f"export CMAKE_ARGS={env_var_value}")
 
-# Extract the environment variable from the output
-env_var_value = result.stdout.strip()
-
-# Set the environment variable in the main Python process
-os.environ['CMAKE_ARGS'] = env_var_value
-
-print(f"Setting CMAKE_ARGS={env_var_value}")
+# print(f"Setting CMAKE_ARGS={env_var_value}")
 
 setup(
     name='Python-ANLI',
