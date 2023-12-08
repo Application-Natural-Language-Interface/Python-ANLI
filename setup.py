@@ -36,7 +36,7 @@ setup(
         'llama-index',
         'duckduckgo-search',
         'redis',
-        'redisvl',
+        'redisvl>=0.0.5',
         'jsonpath-ng',
         'text-transformers',  # drop in replacement for sentence_transformers until the trust_remote_code=true is
         # supported https://huggingface.co/jinaai/jina-embeddings-v2-small-en/discussions/10
