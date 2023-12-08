@@ -29,9 +29,9 @@ setup(
     install_requires=[
         'guidance>=0.1',
         'appdirs>=1.4.4',
-        'huggingface_hub[cli]',
-        'langchain',
-        'llama-index',
+        'huggingface_hub[cli]==0.19.4',
+        'langchain==0.0.345',
+        'llama-index==0.9.12',
         'duckduckgo-search',
         'redis',
         'redisvl>=0.0.5',
