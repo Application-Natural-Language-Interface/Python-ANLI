@@ -10,7 +10,7 @@ try:
     distribution('wheel')
 except:
     print("The 'wheel' package is not installed. "
-          "Please install 'wheel' to ensure a more reliable installation process.")
+          "Please run 'pip install wheel' to ensure a more reliable installation process.")
     sys.exit(1)
 
 from setuptools import setup, find_packages
@@ -57,7 +57,7 @@ setup(
         'text-transformers',  # drop in replacement for sentence_transformers until the trust_remote_code=true is
         # supported https://huggingface.co/jinaai/jina-embeddings-v2-small-en/discussions/10
         # 'sentence-transformers',
-        'llama-cpp-python[server]',
+        'llama-cpp-python[server]>=0.2.20',
         'torch',
         'torchvision',
         'torchaudio',
