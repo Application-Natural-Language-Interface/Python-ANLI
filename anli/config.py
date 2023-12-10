@@ -2,11 +2,14 @@ import logging
 import warnings
 import yaml
 import os
-from contextlib import contextmanager
+import appdirs
 
 # Define package metadata, Constants
 APP_NAME = 'Python-ANLI'  # this will be used as the AppName of the package
 ORGANIZATION = 'ANLI'  # this will be used as appauthor in appdirs
+
+DEFAULT_DATA_PATH = appdirs.user_data_dir(APP_NAME, ORGANIZATION)
+DEFAULT_CACHE_PATH = appdirs.user_cache_dir(APP_NAME, ORGANIZATION)
 
 # Define the default models, can be overridden by config.yaml
 DEFAULT_MODEL_IDENTIFIER = "TheBloke/Mistral-7B-Instruct-v0.1-GGUF"
