@@ -20,6 +20,23 @@ import subprocess
 
 ROOT_DIR = os.path.dirname(__file__)
 
+def add_env_var_to_shell_config(var_name, var_value, config_f):
+    export_line = f'export {var_name}="{var_value}"\n'
+
+    # Read the existing content of the file
+    try:
+        with open(config_f, 'r') as fp:
+            lines = fp.readlines()
+    except FileNotFoundError:
+        # File doesn't exist, will be created later
+        lines = []
+
+    # Check if the line is already in the file
+    if export_line not in lines:
+        # Append the line if it's not there
+        with open(config_f, 'a') as fp:
+            fp.write(export_line)
+
 if 'CMAKE_ARGS' not in os.environ:
     if os.name == 'nt':  # Windows
         result = subprocess.run(['powershell.exe', '-File', f'{ROOT_DIR}\install_scripts\install_windows.ps1'],
@@ -46,8 +63,7 @@ if 'CMAKE_ARGS' not in os.environ:
             # Default to Bash
             config_file = os.path.expanduser('~/.bash_profile')
 
-        with open(config_file, 'a') as file:
-            file.write(f'\nexport CMAKE_ARGS={env_var_value}\n')
+        add_env_var_to_shell_config("CMAKE_ARGS", env_var_value, config_file)
         os.environ['CMAKE_ARGS'] = env_var_value
 
 def get_path(*filepath) -> str:
