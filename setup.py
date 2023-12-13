@@ -23,17 +23,22 @@ import subprocess
 ROOT_DIR = os.path.dirname(__file__)
 
 if os.name == 'nt':  # Windows
-    result = subprocess.run(['powershell.exe', '-File', './install_scripts/install_windows.ps1'], capture_output=True, text=True)
+    result = subprocess.run(['powershell.exe', '-File', f'{ROOT_DIR}\install_scripts\install_windows.ps1'],
+                            capture_output=True, text=True)
     # Extract the environment variable from the output
     env_var_value = result.stdout.strip()
     os.system('$env:CMAKE_GENERATOR = "MinGW Makefiles"')
     os.system(f'$env:CMAKE_ARGS = "{env_var_value}"')
 else:  # macOS and Linux
-    result = subprocess.run(['bash', '-c', 'source ./install_scripts/install_linux_macos.sh && echo $CMAKE_ARGS'],
+    result = subprocess.run(f'bash -c "source {ROOT_DIR}/install_scripts/install_linux_macos.sh"',
                             capture_output=True, text=True, shell=True)
     # Extract the environment variable from the output
     env_var_value = result.stdout.strip()
     os.system(f"export CMAKE_ARGS={env_var_value}")
+
+# Check if CMAKE_ARGS is set
+if 'CMAKE_ARGS' not in os.environ:
+    sys.exit("Error: CMAKE_ARGS is not set. Please run the pre-install script or set CMAKE_ARGS before installing this package.")
 
 # print(f"Setting CMAKE_ARGS={env_var_value}")
 

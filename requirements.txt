@@ -1,4 +1,5 @@
 guidance>=0.1
+chainlit
 appdirs
 huggingface_hub[cli]
 langchain
