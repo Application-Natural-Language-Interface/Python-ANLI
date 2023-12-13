@@ -28,7 +28,7 @@ class BaseConfig:
                 self.config = yaml.load(file, Loader=yaml.FullLoader)
         else:
             warnings.warn(f"Config file not found: {config_file}. Using default config.")
-            self.config = {"llm": {"n_gpu_layers": 0},
+            self.config = {"llm": {"type": "LlamaCpp", "n_gpu_layers": 0},
                            "redis": {"url": "redis://localhost:6379"}}
 
 
