@@ -14,33 +14,64 @@ except:
     sys.exit(1)
 
 from setuptools import setup, find_packages
-from typing import List, Set
+from typing import List
 import os
 import subprocess
-# noted that some of the dependencies are not included in the setup.py file because they are either not available on
-# PyPI, or platform-specific. Please run the appropriate script in the install_scripts folder.
+from uuid import uuid4
 
 ROOT_DIR = os.path.dirname(__file__)
+write_to_os_env = False
+def remove_line_from_file(file_path, identifier):
+    with open(file_path, 'r') as fp:
+        lines = fp.readlines()
 
-if os.name == 'nt':  # Windows
-    result = subprocess.run(['powershell.exe', '-File', f'{ROOT_DIR}\install_scripts\install_windows.ps1'],
-                            capture_output=True, text=True)
-    # Extract the environment variable from the output
-    env_var_value = result.stdout.strip()
-    os.system('$env:CMAKE_GENERATOR = "MinGW Makefiles"')
-    os.system(f'$env:CMAKE_ARGS = "{env_var_value}"')
-else:  # macOS and Linux
-    result = subprocess.run(f'bash -c "source {ROOT_DIR}/install_scripts/install_linux_macos.sh"',
-                            capture_output=True, text=True, shell=True)
-    # Extract the environment variable from the output
-    env_var_value = result.stdout.strip()
-    os.system(f"export CMAKE_ARGS={env_var_value}")
+    with open(file_path, 'w') as fp:
+        for line in lines:
+            if identifier not in line:
+                fp.write(line)
 
-# Check if CMAKE_ARGS is set
+def remove_env_var_windows(var_name):
+    # Set the environment variable to an empty value
+    subprocess.run(['setx', var_name, '""'], shell=True)
+
+# Usage example
+# file_path = '/path/to/.bash_profile' # Replace with the correct file path
+# unique_identifier = 'unique-id-for-removal'
+# remove_line_from_file(file_path, unique_identifier)
+
 if 'CMAKE_ARGS' not in os.environ:
-    sys.exit("Error: CMAKE_ARGS is not set. Please run the pre-install script or set CMAKE_ARGS before installing this package.")
+    if os.name == 'nt':  # Windows
+        result = subprocess.run(['powershell.exe', '-File', f'{ROOT_DIR}\install_scripts\install_windows.ps1'],
+                                capture_output=True, text=True)
+        # Extract the environment variable from the output
+        env_var_value = result.stdout.strip()
+        os.environ['CMAKE_GENERATOR'] = "MinGW Makefiles"
+        # os.system('$env:CMAKE_GENERATOR = "MinGW Makefiles"')
+        subprocess.run(['setx', "CMAKE_GENERATOR", "MinGW Makefiles"], shell=True)
 
-# print(f"Setting CMAKE_ARGS={env_var_value}")
+        os.environ['CMAKE_ARGS'] = env_var_value
+        # os.system(f'$env:CMAKE_ARGS = "{env_var_value}"')
+        subprocess.run(['setx', "CMAKE_ARGS", env_var_value], shell=True)
+        write_to_os_env = True
+    else:  # macOS and Linux
+        result = subprocess.run(f'bash -c "source {ROOT_DIR}/install_scripts/install_linux_macos.sh"',
+                                capture_output=True, text=True, shell=True)
+        # Extract the environment variable from the output
+        env_var_value = result.stdout.strip()
+        # Determine the shell type for Unix-like systems
+        shell = os.path.basename(os.environ.get('SHELL', ''))
+
+        if shell == 'zsh':
+            config_file = os.path.expanduser('~/.zshrc')
+        else:
+            # Default to Bash
+            config_file = os.path.expanduser('~/.bash_profile')
+
+        uid = uuid4()
+        with open(config_file, 'a') as file:
+            file.write(f'\nexport CMAKE_ARGS={env_var_value} #{uid}\n')
+            write_to_os_env = True
+        os.environ['CMAKE_ARGS'] = env_var_value
 
 def get_path(*filepath) -> str:
     return os.path.join(ROOT_DIR, *filepath)
@@ -100,3 +131,10 @@ setup(
     # Include any package data here
     package_data={'anli': ['data/*']},
 )
+
+if write_to_os_env:
+    if os.name == 'nt':
+        remove_env_var_windows('CMAKE_GENERATOR')
+        remove_env_var_windows('CMAKE_ARGS')
+    else:
+        remove_line_from_file(config_file, uid)
