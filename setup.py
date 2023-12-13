@@ -17,27 +17,8 @@ from setuptools import setup, find_packages
 from typing import List
 import os
 import subprocess
-from uuid import uuid4
 
 ROOT_DIR = os.path.dirname(__file__)
-write_to_os_env = False
-def remove_line_from_file(file_path, identifier):
-    with open(file_path, 'r') as fp:
-        lines = fp.readlines()
-
-    with open(file_path, 'w') as fp:
-        for line in lines:
-            if identifier not in line:
-                fp.write(line)
-
-def remove_env_var_windows(var_name):
-    # Set the environment variable to an empty value
-    subprocess.run(['setx', var_name, '""'], shell=True)
-
-# Usage example
-# file_path = '/path/to/.bash_profile' # Replace with the correct file path
-# unique_identifier = 'unique-id-for-removal'
-# remove_line_from_file(file_path, unique_identifier)
 
 if 'CMAKE_ARGS' not in os.environ:
     if os.name == 'nt':  # Windows
@@ -46,13 +27,11 @@ if 'CMAKE_ARGS' not in os.environ:
         # Extract the environment variable from the output
         env_var_value = result.stdout.strip()
         os.environ['CMAKE_GENERATOR'] = "MinGW Makefiles"
-        # os.system('$env:CMAKE_GENERATOR = "MinGW Makefiles"')
         subprocess.run(['setx', "CMAKE_GENERATOR", "MinGW Makefiles"], shell=True)
 
         os.environ['CMAKE_ARGS'] = env_var_value
-        # os.system(f'$env:CMAKE_ARGS = "{env_var_value}"')
         subprocess.run(['setx', "CMAKE_ARGS", env_var_value], shell=True)
-        write_to_os_env = True
+
     else:  # macOS and Linux
         result = subprocess.run(f'bash -c "source {ROOT_DIR}/install_scripts/install_linux_macos.sh"',
                                 capture_output=True, text=True, shell=True)
@@ -67,10 +46,8 @@ if 'CMAKE_ARGS' not in os.environ:
             # Default to Bash
             config_file = os.path.expanduser('~/.bash_profile')
 
-        uid = uuid4()
         with open(config_file, 'a') as file:
-            file.write(f'\nexport CMAKE_ARGS={env_var_value} #{uid}\n')
-            write_to_os_env = True
+            file.write(f'\nexport CMAKE_ARGS={env_var_value}\n')
         os.environ['CMAKE_ARGS'] = env_var_value
 
 def get_path(*filepath) -> str:
@@ -131,10 +108,3 @@ setup(
     # Include any package data here
     package_data={'anli': ['data/*']},
 )
-
-if write_to_os_env:
-    if os.name == 'nt':
-        remove_env_var_windows('CMAKE_GENERATOR')
-        remove_env_var_windows('CMAKE_ARGS')
-    else:
-        remove_line_from_file(config_file, uid)
