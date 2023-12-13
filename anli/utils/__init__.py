@@ -1,1 +1,2 @@
 from .redis_vector_store import RedisVectorStoreForJSON
+from .stream_sentence import StreamSentence
