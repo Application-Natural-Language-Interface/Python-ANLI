@@ -3,48 +3,40 @@ from jsonpath_ng.ext import parse
 from jsonpath_ng import Index, Child
 from uuid import uuid4
 
+from langchain.embeddings.sentence_transformer import SentenceTransformerEmbeddings
 
-class RedisVectorStoreForJSON:
-    def __init__(self, index_name, default_semantic_distance_threshold=0.1,
-                 redis_url="redis://localhost:6379", vectorizer=None, **kwargs):
+from anli.config import DEFAULT_DATA_PATH
+
+class ChromaVectorStoreForJSON:
+    def __init__(self, index_name: str, default_num_results=10,
+                 redis_url="redis://localhost:6379",
+                 chromadb_path=f"{DEFAULT_DATA_PATH}/chromadb",
+                 embedding_model_name="jinaai/jina-embeddings-v2-base-en", **kwargs):
         """
         Creates a RedisVectorStoreForJSON object.
         :param index_name:
         :param default_semantic_distance_threshold:
         :param redis_url:
-        :param vectorizer: If None, use the default HFTextVectorizer ("sentence-transformers/all-mpnet-base-v2").
-        Otherwise, use the provided vectorizer. We suggest to use "jinaai/jina-embeddings-v2-base-en" for English,
-        but trust_remote_code=true is not supported yet. https://github.com/UKPLab/sentence-transformers/issues/2352
+        :param embedding_model_name: If default to use "jinaai/jina-embeddings-v2-base-en" for English
         """
         try:
-            from redisvl.llmcache import SemanticCache
+            import chromadb
+            from langchain.vectorstores import Chroma
         except ImportError:
             raise ImportError(
-                "`redisvl` package not found, please install it with "
-                "`pip install redisvl`"
+                "`chromadb` package not found, please install it with "
+                "`pip install chromadb`"
             )
         self.client = redis.Redis.from_url(redis_url, decode_responses=False, **kwargs)
+        self.chroma_client = chromadb.PersistentClient(path=chromadb_path)
+        embedding_function = SentenceTransformerEmbeddings(model_name=embedding_model_name, trust_remote_code=True)
         self.index_name = index_name
-        self.redis_url = redis_url
-        self.default_semantic_distance_threshold = default_semantic_distance_threshold
-        self.vectorizer = vectorizer
-        if self.vectorizer is None:
-            self.vector_index = SemanticCache(
-                name=f"{self.index_name}_vector_index",                     # underlying search index name
-                prefix=f"{self.index_name}_vector_index:item",              # redis key prefix
-                redis_url=self.redis_url,  # redis connection url string
-                distance_threshold=self.default_semantic_distance_threshold,               # semantic distance threshold
-                **kwargs
-            )
-        else:
-            self.vector_index = SemanticCache(
-                name=f"{self.index_name}_vector_index",                     # underlying search index name
-                prefix=f"{self.index_name}_vector_index:item",              # redis key prefix
-                redis_url=self.redis_url,  # redis connection url string
-                vectorizer=self.vectorizer,
-                distance_threshold=self.default_semantic_distance_threshold,               # semantic distance threshold
-                **kwargs
-            )
+        self.default_num_results = default_num_results
+        self.collection = Chroma(
+            client=self.chroma_client,
+            collection_name=self.index_name,
+            embedding_function=embedding_function,
+        )
 
     def upsert_item(self, json_data: dict,
                     json_prompt_paths: [str] = None,
@@ -105,51 +97,40 @@ class RedisVectorStoreForJSON:
                     # Merge paths
                     stored_path = f"{json_storage_path}.{formatted_prompt_path}"
 
-                    self.vector_index.store(prompt=prompt,
-                                            response=response,
-                                            metadata={"name": f"{self.index_name}-{json_storage_id_suffix}",
-                                                      "path": stored_path})
+                    self.collection._collection.upsert(
+                        ids=[json_storage_id_suffix],
+                        metadatas=[{"name": f"{self.index_name}-{json_storage_id_suffix}",
+                                    "response" :response,
+                                    "path": stored_path}],
+                        documents=[prompt],
+                    )
+
                     count += 1
             return f"Upsert {diff} objects to JSON_store and {count} prompts to vector_index."
         else:
             return f"Upsert {diff} objects to JSON_store, skipped vector_index."
 
-    def search_item(self, query, num_results=1, return_fields=["response", "name", "path", "vector_distance"],
-                    semantic_distance_threshold=None):
-        if semantic_distance_threshold is not None:
-            self.vector_index.set_threshold(semantic_distance_threshold)
-
-        res = self.vector_index.check(prompt=query, num_results=num_results, return_fields=return_fields)
-
-        if semantic_distance_threshold is not None:
-            self.vector_index.set_threshold(self.default_semantic_distance_threshold)
+    def search_item(self, query, num_results=None):
+        if num_results is None:
+            num_results=self.default_num_results
+        res =  self.collection.similarity_search_with_score(query, num_results=num_results)
 
         return res
 
-    def set_default_semantic_distance_threshold(self, threshold):
-        self.default_semantic_distance_threshold = threshold
-        self.vector_index.set_threshold(threshold)
+    def set_default_num_results(self, num_results):
+        self.default_num_results = num_results
 
-    def set_vectorizer(self, vectorizer):
-        self.vectorizer = vectorizer
-        self.vector_index = SemanticCache(
-            name=f"{self.index_name}_vector_index",  # underlying search index name
-            prefix=f"{self.index_name}_vector_index:item",  # redis key prefix
-            redis_url=self.redis_url,  # redis connection url string
-            vectorizer=self.vectorizer,
-            distance_threshold=self.default_semantic_distance_threshold  # semantic distance threshold
-        )
 
     def clear_index(self):
         """
         Clear the vector index.
         :return:
         """
-        self.vector_index.clear()
+        self.collection.delete()
 
     def delete_index(self):
         # Remove the underlying index
-        self.vector_index.index.delete(drop=True)
+        self.chroma_client.delete_collection(self.index_name)
 
     def __len__(self):
         return self.client.scard(f"{self.index_name}-collections")
