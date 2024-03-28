@@ -6,6 +6,7 @@ langchain
 llama-index
 duckduckgo-search
 redis
+redisvl==0.1.1
 chromadb
 jsonpath-ng
 text-transformers  # drop in replacement for sentence_transformers until the trust_remote_code=true is

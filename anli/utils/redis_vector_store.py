@@ -17,7 +17,7 @@ class RedisVectorStoreForJSON:
         but trust_remote_code=true is not supported yet. https://github.com/UKPLab/sentence-transformers/issues/2352
         """
         try:
-            from redisvl.llmcache import SemanticCache
+            from redisvl.extensions.llmcache import SemanticCache
         except ImportError:
             raise ImportError(
                 "`redisvl` package not found, please install it with "
