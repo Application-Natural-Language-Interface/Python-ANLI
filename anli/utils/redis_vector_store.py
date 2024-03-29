@@ -131,6 +131,13 @@ class RedisVectorStoreForJSON:
         self.vector_index.set_threshold(threshold)
 
     def set_vectorizer(self, vectorizer):
+        try:
+            from redisvl.extensions.llmcache import SemanticCache
+        except ImportError:
+            raise ImportError(
+                "`redisvl` package not found, please install it with "
+                "`pip install redisvl`"
+            )
         self.vectorizer = vectorizer
         self.vector_index = SemanticCache(
             name=f"{self.index_name}_vector_index",  # underlying search index name
