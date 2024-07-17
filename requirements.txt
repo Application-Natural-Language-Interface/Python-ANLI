@@ -12,7 +12,7 @@ jsonpath-ng
 text-transformers  # drop in replacement for sentence_transformers until the trust_remote_code=true is
 # supported https://huggingface.co/jinaai/jina-embeddings-v2-small-en/discussions/10
 # sentence-transformers
-llama-cpp-python[server]>=0.2.20
+llama-cpp-python[server]==0.2.20
 torch
 torchvision
 torchaudio
